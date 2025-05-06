@@ -1,0 +1,28 @@
+# Build directory
+build/
+
+# Object files
+*.o
+*.obj
+*.bin
+*.elf
+
+# Binary files
+*.img
+*.iso
+
+# Debug files
+*.debug
+
+# Editor specific files
+.vscode/
+.vs/
+*.swp
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
