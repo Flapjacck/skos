@@ -2,7 +2,6 @@
 
 A simple operating system project for learning and experimentation purposes.
 
-
 ## Tools Used
 
 - TDM-GCC (Compiler)
