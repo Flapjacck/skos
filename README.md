@@ -10,3 +10,10 @@ A simple operating system project for learning and experimentation purposes.
 - GRUB (Bootloader)
 - GNU Make (Build Automation)
 
+## Build Instructions
+
+Run the Makefile to compile and run the operating system in QEMU.
+
+```shell
+make
+```
