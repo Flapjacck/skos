@@ -4,14 +4,9 @@ A simple operating system project for learning and experimentation purposes.
 
 ## Tools Used
 
-- TDM-GCC (Compiler)
+- TDM-GCC (Compiler and GNU Binutils)
 - NASM (Netwide Assembler)
 - QEMU (Emulator)
+- GRUB (Bootloader)
+- GNU Make (Build Automation)
 
-## Build Instructions
-
-Run `build.bat` to compile and run the operating system in QEMU.
-
-```shell
-.\build.bat
-```
