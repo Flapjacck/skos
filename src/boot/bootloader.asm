@@ -35,30 +35,73 @@ print:
 done:
 
 ;------------------------------------------------------------------------------
-; Load kernel from disk
+; Switch to Protected Mode and load kernel
 ;------------------------------------------------------------------------------
-mov ax, 0x1000      ; Set segment where we'll load the kernel
-mov es, ax          ; ES = Extra Segment register
-mov bx, 0x0000      ; ES:BX = 0x1000:0000 = Physical address 0x10000
+cli                 ; Disable interrupts
 
-; Set up disk read operation
-mov ah, 0x02        ; BIOS function: read disk sectors
-mov al, 1           ; Number of sectors to read
-mov ch, 0           ; Cylinder number (0-based)
-mov cl, 2           ; Sector number (1-based, sector 2 = right after bootloader)
-mov dh, 0           ; Head number
-mov dl, 0           ; Drive number (0 = first floppy, 0x80 = first hard disk)
-int 0x13            ; BIOS disk interrupt
-                    ; If successful: CF (carry flag) = 0
-                    ; If error: CF = 1
-jc disk_error       ; Jump if carry flag is set (error occurred)
+; Enable A20 line
+in al, 0x92         ; Fast A20 Gate
+or al, 2
+out 0x92, al
+
+; Load GDT
+lgdt [gdt_descriptor]
+
+; Enable Protected Mode
+mov eax, cr0
+or eax, 1
+mov cr0, eax
+
+; Far jump to 32-bit code
+jmp 0x08:protected_mode
+
+BITS 32             ; From this point on, we're in 32-bit mode
+
+protected_mode:
+    ; Set up segment registers
+    mov ax, 0x10    ; Data segment selector
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    ; Copy kernel from disk to 1MB
+    mov esi, 0x7E00 ; Source: right after bootloader
+    mov edi, 0x100000 ; Destination: 1MB mark (matches linker script)
+    mov ecx, 512    ; Copy 512 bytes (one sector)
+    rep movsb       ; Repeat move string byte
+
+    ; Jump to kernel
+    jmp 0x100000    ; Jump to kernel entry at 1MB
 
 ;------------------------------------------------------------------------------
-; Jump to kernel
+; Global Descriptor Table
 ;------------------------------------------------------------------------------
-jmp 0x1000:0000     ; Far jump to kernel
-                    ; Changes CS (Code Segment) to 0x1000
-                    ; Sets IP (Instruction Pointer) to 0x0000
+gdt_start:
+    ; Null descriptor
+    dd 0x0
+    dd 0x0
+
+    ; Code segment descriptor
+    dw 0xFFFF       ; Limit (bits 0-15)
+    dw 0x0          ; Base (bits 0-15)
+    db 0x0          ; Base (bits 16-23)
+    db 10011010b    ; Access byte
+    db 11001111b    ; Flags + Limit (bits 16-19)
+    db 0x0          ; Base (bits 24-31)
+
+    ; Data segment descriptor
+    dw 0xFFFF       ; Limit (bits 0-15)
+    dw 0x0          ; Base (bits 0-15)
+    db 0x0          ; Base (bits 16-23)
+    db 10010010b    ; Access byte
+    db 11001111b    ; Flags + Limit (bits 16-19)
+    db 0x0          ; Base (bits 24-31)
+
+gdt_descriptor:
+    dw $ - gdt_start - 1  ; GDT size
+    dd gdt_start          ; GDT address
 
 ;------------------------------------------------------------------------------
 ; Error handler
