@@ -1,19 +1,40 @@
-all: os-image.bin
+# Compiler and linker settings
+CC = gcc
+CFLAGS = -m32 -ffreestanding -Wall -Wextra -fno-exceptions -fno-stack-protector
+LDFLAGS = -m elf_i386 -T src/kernel/linker.ld
 
-bootloader.bin: src/boot/bootloader.asm
-	nasm -f bin src/boot/bootloader.asm -o bootloader.bin
+# Object files
+KERNEL_OBJS = \
+	boot.o \
+	kernel.o
 
+# Default target
+all: myos.iso
+
+# Compile assembly files
+boot.o: src/boot/bootloader.asm
+	nasm -f elf32 src/boot/bootloader.asm -o boot.o
+
+# Compile C files
 kernel.o: src/kernel/kernel.c
-	gcc -m32 -fno-pie -fno-pic -ffreestanding -c src/kernel/kernel.c -o kernel.o
+	$(CC) $(CFLAGS) -c src/kernel/kernel.c -o kernel.o
 
-kernel.bin: kernel.o
-	ld -m elf_i386 -Ttext 0x1000 --oformat binary -e kmain -o kernel.bin kernel.o
+# Link the kernel
+myos.bin: $(KERNEL_OBJS)
+	$(LD) $(LDFLAGS) -o $@ $(KERNEL_OBJS)
 
-os-image.bin: bootloader.bin kernel.bin
-	cat bootloader.bin kernel.bin > os-image.bin
+# Create an ISO image
+myos.iso: myos.bin
+	mkdir -p isodir/boot/grub
+	cp myos.bin isodir/boot/myos.bin
+	cp src/boot/grub.cfg isodir/boot/grub/grub.cfg
+	grub-mkrescue -o myos.iso isodir
 
-run: os-image.bin
-	qemu-system-i386 -fda os-image.bin
+# Run the OS in QEMU
+run: myos.iso
+	qemu-system-i386 -cdrom myos.iso
 
+# Clean up
 clean:
-	rm -f *.bin *.o
+	rm -f *.o *.bin *.iso
+	rm -rf isodir

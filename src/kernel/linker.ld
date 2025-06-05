@@ -1,40 +1,40 @@
-/* Kernel entry point */
+/* The bootloader will look at this image and start execution at the symbol
+   designated as the entry point. */
 ENTRY(_start)
 
-/* Define the program headers we want in our final kernel executable */
-PHDRS
-{
-    text    PT_LOAD    FLAGS((1 << 0) | (1 << 2)); /* Execute + Read */
-    rodata  PT_LOAD    FLAGS((1 << 2));            /* Read only */
-    data    PT_LOAD    FLAGS((1 << 1) | (1 << 2)); /* Write + Read */
-}
-
+/* Tell where the various sections of the object files will be put in the final
+   kernel image. */
 SECTIONS
 {
-    /* Kernel starts at 1M mark */
+    /* Begin putting sections at 1 MiB, a conventional place for kernels to be
+       loaded at by the bootloader. */
     . = 1M;
 
-    .text ALIGN(4K) : {
-        *(.multiboot)  /* Multiboot header first */
-        *(.text)       /* All text sections from all files */
-    } :text
+    /* First put the multiboot header, as it is required to be put very early
+       in the image or the bootloader won't recognize the file format.
+       Next we put the .text section. */
+    .text BLOCK(4K) : ALIGN(4K)
+    {
+        *(.multiboot)
+        *(.text)
+    }
 
-    .rodata ALIGN(4K) : {
-        *(.rodata)     /* Read-only data sections */
-    } :rodata
+    /* Read-only data. */
+    .rodata BLOCK(4K) : ALIGN(4K)
+    {
+        *(.rodata)
+    }
 
-    .data ALIGN(4K) : {
-        *(.data)       /* Data segments */
-    } :data
+    /* Read-write data (initialized) */
+    .data BLOCK(4K) : ALIGN(4K)
+    {
+        *(.data)
+    }
 
-    .bss ALIGN(4K) : {
-        *(COMMON)      /* Common symbols */
-        *(.bss)        /* BSS segment */
-    } :data
-
-    /* Discard unused sections */
-    /DISCARD/ : {
-        *(.eh_frame)
-        *(.comment)
+    /* Read-write data (uninitialized) and stack */
+    .bss BLOCK(4K) : ALIGN(4K)
+    {
+        *(COMMON)
+        *(.bss)
     }
 }
