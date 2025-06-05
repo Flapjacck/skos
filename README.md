@@ -1,6 +1,6 @@
 # SKOS Operating System
 
-A simple operating system project for learning and experimentation purposes.
+A simple operating system project for learning and experimentation purposes. [Followed this guide](https://wiki.osdev.org/Bare_Bones)
 
 ## Important Requirements
 
@@ -15,7 +15,7 @@ If you're using Windows, consider:
 ## Tools Used
 
 ```shell
-sudo apt install build-essential nasm qemu-system-x86 grub-pc-bin
+sudo apt install build-essential nasm qemu-system-x86 grub-pc-bin xorriso
 ```
 
 ## Build Instructions
