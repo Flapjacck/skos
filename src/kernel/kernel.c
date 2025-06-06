@@ -11,6 +11,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "kernel.h"
+
 /* Hardware text mode color constants */
 enum vga_color {
     VGA_COLOR_BLACK = 0,
@@ -31,16 +33,6 @@ enum vga_color {
     VGA_COLOR_WHITE = 15,
 };
 
-/* Function to combine foreground and background colors */
-static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) {
-    return fg | bg << 4;
-}
-
-/* Function to create a VGA entry (character with color) */
-static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
-    return (uint16_t) uc | (uint16_t) color << 8;
-}
-
 /* Constants for VGA text mode buffer */
 static const size_t VGA_WIDTH = 80;
 static const size_t VGA_HEIGHT = 25;
@@ -50,6 +42,16 @@ size_t terminal_row;
 size_t terminal_column;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
+
+/* Implementation of kernel functions */
+
+uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) {
+    return fg | bg << 4;
+}
+
+uint16_t vga_entry(unsigned char uc, uint8_t color) {
+    return (uint16_t) uc | (uint16_t) color << 8;
+}
 
 /* Initialize the terminal */
 void terminal_initialize(void) {
