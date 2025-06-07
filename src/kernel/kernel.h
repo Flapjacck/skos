@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Include GDT definitions */
+#include "gdt.h"
+
 /*------------------------------------------------------------------------------
  * VGA Text Mode Color Constants
  *------------------------------------------------------------------------------
@@ -127,5 +130,12 @@ void terminal_newline(void);
  * @param c Character to output
  */
 void terminal_putchar(char c);
+
+/**
+ * @brief Outputs a string to the terminal
+ * 
+ * @param data Null-terminated string to output
+ */
+void terminal_writestring(const char* data);
 
 #endif /* KERNEL_H */

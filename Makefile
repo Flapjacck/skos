@@ -6,7 +6,9 @@ LDFLAGS = -m elf_i386 -T src/kernel/linker.ld
 # Object files
 KERNEL_OBJS = \
 	boot.o \
-	kernel.o
+	kernel.o \
+	gdt.o \
+	gdt_asm.o
 
 # Default target
 all: myos.iso
@@ -18,6 +20,14 @@ boot.o: src/boot/bootloader.asm
 # Compile C files
 kernel.o: src/kernel/kernel.c
 	$(CC) $(CFLAGS) -c src/kernel/kernel.c -o kernel.o
+
+# Compile GDT C implementation
+gdt.o: src/kernel/gdt.c
+	$(CC) $(CFLAGS) -c src/kernel/gdt.c -o gdt.o
+
+# Compile GDT assembly functions
+gdt_asm.o: src/kernel/gdt.asm
+	nasm -f elf32 src/kernel/gdt.asm -o gdt_asm.o
 
 # Link the kernel
 myos.bin: $(KERNEL_OBJS)

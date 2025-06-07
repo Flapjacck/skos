@@ -86,10 +86,20 @@ void terminal_writestring(const char* data) {
 
 /* Kernel main function */
 void kernel_main(void) {
-    /* Initialize terminal interface */
+    /* Initialize terminal interface first for debug output */
     terminal_initialize();
 
-    /* Welcome message */
+    /* Display startup message */
+    terminal_writestring("SKOS Kernel Starting...\n");
+    
+    /* Initialize Global Descriptor Table (GDT) */
+    terminal_writestring("Initializing GDT... ");
+    gdt_init();
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
+    /* Reset color and display welcome message */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Welcome to SKOS!\n");
     terminal_writestring("A bare bones operating system\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
