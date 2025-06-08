@@ -11,7 +11,8 @@ KERNEL_OBJS = \
 	gdt_asm.o \
 	idt.o \
 	idt_asm.o \
-	pic.o
+	pic.o \
+	keyboard.o
 
 # Default target
 all: myos.iso
@@ -43,6 +44,10 @@ idt_asm.o: src/kernel/idt.asm
 # Compile PIC C implementation
 pic.o: src/kernel/pic.c
 	$(CC) $(CFLAGS) -c src/kernel/pic.c -o pic.o
+
+# Compile keyboard driver
+keyboard.o: src/drivers/keyboard.c
+	$(CC) $(CFLAGS) -c src/drivers/keyboard.c -o keyboard.o
 
 # Link the kernel
 myos.bin: $(KERNEL_OBJS)

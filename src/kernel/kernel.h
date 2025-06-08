@@ -14,6 +14,9 @@
 /* Include PIC definitions */
 #include "pic.h"
 
+/* Include keyboard driver definitions */
+#include "../drivers/keyboard.h"
+
 /*------------------------------------------------------------------------------
  * VGA Text Mode Color Constants
  *------------------------------------------------------------------------------
@@ -143,5 +146,37 @@ void terminal_putchar(char c);
  * @param data Null-terminated string to output
  */
 void terminal_writestring(const char* data);
+
+/**
+ * @brief Show the cursor at the current terminal position
+ */
+void terminal_show_cursor(void);
+
+/**
+ * @brief Hide the cursor
+ */
+void terminal_hide_cursor(void);
+
+/**
+ * @brief Update cursor position to match terminal position
+ */
+void terminal_update_cursor(void);
+
+/**
+ * @brief Clear the current line from cursor position to end
+ */
+void terminal_clear_line_from_cursor(void);
+
+/**
+ * @brief Handle backspace operation
+ */
+void terminal_backspace(void);
+
+/**
+ * @brief Initialize keyboard input mode
+ * 
+ * This function enables keyboard input and displays a prompt with cursor
+ */
+void terminal_start_input(void);
 
 #endif /* KERNEL_H */

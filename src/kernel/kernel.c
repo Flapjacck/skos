@@ -87,6 +87,69 @@ void terminal_writestring(const char* data) {
         terminal_putchar(data[i]);
 }
 
+/* I/O port functions for cursor control */
+static inline void outb(uint16_t port, uint8_t val) {
+    asm volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline uint8_t inb(uint16_t port) {
+    uint8_t ret;
+    asm volatile ("inb %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+/* Show the cursor at the current terminal position */
+void terminal_show_cursor(void) {
+    /* Enable cursor */
+    outb(0x3D4, 0x0A);  /* Cursor Start Register */
+    outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);  /* Cursor start line 0 */
+    
+    outb(0x3D4, 0x0B);  /* Cursor End Register */
+    outb(0x3D5, (inb(0x3D5) & 0xE0) | 15); /* Cursor end line 15 */
+}
+
+/* Hide the cursor */
+void terminal_hide_cursor(void) {
+    outb(0x3D4, 0x0A);  /* Cursor Start Register */
+    outb(0x3D5, 0x20);  /* Disable cursor */
+}
+
+/* Update cursor position to match terminal position */
+void terminal_update_cursor(void) {
+    uint16_t pos = terminal_row * VGA_WIDTH + terminal_column;
+    
+    /* Send low byte of cursor position */
+    outb(0x3D4, 0x0F);  /* Cursor Location Low Register */
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    
+    /* Send high byte of cursor position */
+    outb(0x3D4, 0x0E);  /* Cursor Location High Register */
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+}
+
+/* Clear the current line from cursor position to end */
+void terminal_clear_line_from_cursor(void) {
+    for (size_t x = terminal_column; x < VGA_WIDTH; x++) {
+        terminal_putentryat(' ', terminal_color, x, terminal_row);
+    }
+}
+
+/* Handle backspace operation */
+void terminal_backspace(void) {
+    if (terminal_column > 0) {
+        terminal_column--;
+        terminal_putentryat(' ', terminal_color, terminal_column, terminal_row);
+        terminal_update_cursor();
+    }
+}
+
+/* Initialize keyboard input mode */
+void terminal_start_input(void) {
+    terminal_writestring("\n$ ");  /* Show prompt */
+    terminal_show_cursor();
+    terminal_update_cursor();
+}
+
 /* Kernel main function */
 void kernel_main(void) {
     /* Initialize terminal interface first for debug output */
@@ -114,6 +177,20 @@ void kernel_main(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     
+    /* Initialize Keyboard Driver */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Keyboard... ");
+    keyboard_init();
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
+    /* Enable interrupts */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Enabling interrupts... ");
+    asm volatile ("sti");  /* Enable interrupts */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
     /* Reset color and display welcome message */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Welcome to SKOS!\n");
@@ -121,8 +198,32 @@ void kernel_main(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("System initialized successfully.\n");
     
-    /* Infinite loop to prevent the CPU from executing beyond our code */
-    while(1);    /* The CPU will continue executing this loop forever
-                 * This is necessary because we don't have an operating
-                 * system to return to */
+    /* Start keyboard input mode */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_start_input();
+    
+    /* Main system loop - handle keyboard input */
+    while(1) {
+        /* Process keyboard input if available */
+        if (keyboard_has_data()) {
+            char c = keyboard_getchar();
+            if (c != 0) {
+                if (c == '\n') {
+                    /* Handle enter key - start new line with prompt */
+                    terminal_writestring("\n$ ");
+                    terminal_update_cursor();
+                } else if (c == '\b') {
+                    /* Handle backspace */
+                    terminal_backspace();
+                } else {
+                    /* Echo character */
+                    terminal_putchar(c);
+                    terminal_update_cursor();
+                }
+            }
+        }
+        
+        /* Halt CPU until next interrupt */
+        asm volatile ("hlt");
+    }
 }
