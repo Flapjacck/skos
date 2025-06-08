@@ -10,7 +10,8 @@ KERNEL_OBJS = \
 	gdt.o \
 	gdt_asm.o \
 	idt.o \
-	idt_asm.o
+	idt_asm.o \
+	pic.o
 
 # Default target
 all: myos.iso
@@ -38,6 +39,10 @@ idt.o: src/kernel/idt.c
 # Compile IDT assembly functions
 idt_asm.o: src/kernel/idt.asm
 	nasm -f elf32 src/kernel/idt.asm -o idt_asm.o
+
+# Compile PIC C implementation
+pic.o: src/kernel/pic.c
+	$(CC) $(CFLAGS) -c src/kernel/pic.c -o pic.o
 
 # Link the kernel
 myos.bin: $(KERNEL_OBJS)

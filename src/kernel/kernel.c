@@ -14,6 +14,7 @@
 #include "kernel.h"
 #include "gdt.h"
 #include "idt.h"
+#include "pic.h"
 
 /* Global variables for terminal state */
 size_t terminal_row;
@@ -103,6 +104,13 @@ void kernel_main(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Initializing IDT... ");
     idt_init();
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
+    /* Initialize Programmable Interrupt Controller (PIC) */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing PIC... ");
+    pic_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     

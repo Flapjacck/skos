@@ -16,6 +16,7 @@
 #include "idt.h"
 #include "gdt.h"     /* For KERNEL_CODE_SELECTOR */
 #include "kernel.h"  /* For terminal output functions */
+#include "pic.h"     /* For PIC EOI handling */
 
 /*------------------------------------------------------------------------------
  * IDT Global Variables
@@ -441,9 +442,8 @@ void interrupt_handler(interrupt_registers_t *regs)
         
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
         
-        /* TODO: Send End of Interrupt (EOI) to interrupt controller
-         * This will be implemented when we add PIC (8259) support
-         */
+        /* Send End of Interrupt (EOI) to PIC */
+        pic_send_eoi(irq_num);
     }
     
     /*

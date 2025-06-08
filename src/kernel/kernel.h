@@ -11,6 +11,9 @@
 /* Include IDT definitions */
 #include "idt.h"
 
+/* Include PIC definitions */
+#include "pic.h"
+
 /*------------------------------------------------------------------------------
  * VGA Text Mode Color Constants
  *------------------------------------------------------------------------------
