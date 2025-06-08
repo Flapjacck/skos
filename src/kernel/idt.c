@@ -88,10 +88,10 @@ static const char* exception_messages[] = {
  * @param selector Code segment selector (usually KERNEL_CODE_SELECTOR)
  * @param flags Gate type and access flags
  */
-void idt_set_gate(uint8_t num, uint32_t handler, uint16_t selector, uint8_t flags)
+void idt_set_gate(int num, uint32_t handler, uint16_t selector, uint8_t flags);
 {
     /* Validate vector number to prevent buffer overflow */
-    if (num >= IDT_ENTRIES) {
+    if (num < 0 || num >= IDT_ENTRIES) {
         return; /* Invalid vector number, ignore silently */
     }
 
@@ -415,7 +415,7 @@ void interrupt_handler(interrupt_registers_t *regs)
      */
     else if (regs->int_no >= 32 && regs->int_no < 48) {
         /* This is a hardware IRQ */
-        terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+        terminal_setcolor(vga_entry_color(VGA_COLOR_BROWN, VGA_COLOR_BLACK));
         terminal_writestring("Received IRQ: ");
         
         /* Convert IRQ number to string */
