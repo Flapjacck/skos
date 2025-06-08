@@ -12,6 +12,8 @@
 #include <stdint.h>
 
 #include "kernel.h"
+#include "gdt.h"
+#include "idt.h"
 
 /* Global variables for terminal state */
 size_t terminal_row;
@@ -91,10 +93,16 @@ void kernel_main(void) {
 
     /* Display startup message */
     terminal_writestring("SKOS Kernel Starting...\n");
-    
-    /* Initialize Global Descriptor Table (GDT) */
+      /* Initialize Global Descriptor Table (GDT) */
     terminal_writestring("Initializing GDT... ");
     gdt_init();
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
+    /* Initialize Interrupt Descriptor Table (IDT) */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing IDT... ");
+    idt_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     

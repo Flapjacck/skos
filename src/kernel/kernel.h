@@ -8,6 +8,9 @@
 /* Include GDT definitions */
 #include "gdt.h"
 
+/* Include IDT definitions */
+#include "idt.h"
+
 /*------------------------------------------------------------------------------
  * VGA Text Mode Color Constants
  *------------------------------------------------------------------------------
