@@ -167,9 +167,8 @@ void idt_init(void);
  * @param num Interrupt vector number (0-255)
  * @param handler Address of the interrupt service routine
  * @param selector Code segment selector (usually kernel code from GDT)
- * @param flags Gate type and privilege flags
- */
-void idt_set_gate(uint8_t num, uint32_t handler, uint16_t selector, uint8_t flags);
+ * @param flags Gate type and privilege flags */
+void idt_set_gate(int num, uint32_t handler, uint16_t selector, uint8_t flags);
 
 /**
  * @brief Assembly function to load the IDT

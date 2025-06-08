@@ -82,13 +82,12 @@ static const char* exception_messages[] = {
  * This function configures one entry in the IDT by setting up the
  * interrupt handler address, code segment selector, and gate flags.
  * The 32-bit handler address is split across two 16-bit fields.
- * 
- * @param num Interrupt vector number (0-255)
+ *  * @param num Interrupt vector number (0-255)
  * @param handler Address of the interrupt service routine
  * @param selector Code segment selector (usually KERNEL_CODE_SELECTOR)
  * @param flags Gate type and access flags
  */
-void idt_set_gate(int num, uint32_t handler, uint16_t selector, uint8_t flags);
+void idt_set_gate(int num, uint32_t handler, uint16_t selector, uint8_t flags)
 {
     /* Validate vector number to prevent buffer overflow */
     if (num < 0 || num >= IDT_ENTRIES) {
