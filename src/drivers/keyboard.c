@@ -208,22 +208,9 @@ void keyboard_interrupt_handler(void) {
     /* Read scancode from keyboard */
     uint8_t scancode = inb(PS2_DATA_PORT);
     
-    /* Handle scancode set 2 break codes (0xF0 prefix) */
-    if (scancode == 0xF0) {
-        keyboard_state.extended_scancode = true;  /* Reuse this flag for break codes */
-        return;
-    }
-    
     /* Handle extended scancodes (0xE0 prefix) */
     if (scancode == SCANCODE_EXTENDED) {
         keyboard_state.extended_scancode = true;
-        return;
-    }
-    
-    /* Check if this was a break code (key release) */
-    if (keyboard_state.extended_scancode && scancode != SCANCODE_EXTENDED) {
-        /* This is a key release, ignore it */
-        keyboard_state.extended_scancode = false;
         return;
     }
     
@@ -281,28 +268,8 @@ void keyboard_interrupt_handler(void) {
     char ascii = scancode_to_ascii(scancode);
     
     if (ascii != 0) {
-        /* Handle backspace immediately for better user experience */
-        if (ascii == '\b') {
-            /* Only process backspace if there are characters in the buffer */
-            if (input_buffer.count > 0) {
-                /* Remove last character from buffer */
-                if (input_buffer.write_pos == 0) {
-                    input_buffer.write_pos = KEYBOARD_BUFFER_SIZE - 1;
-                } else {
-                    input_buffer.write_pos--;
-                }
-                input_buffer.count--;
-                
-                /* Update display */
-                terminal_backspace();
-            }
-        } else {
-            /* Regular character - add to buffer and display */
-            input_buffer_put(ascii);
-            if (ascii >= 32 && ascii <= 126) { /* Printable characters */
-                terminal_putchar(ascii);
-            }
-        }
+        /* Just add character to buffer - display will be handled by main loop */
+        input_buffer_put(ascii);
     }
 }
 
@@ -353,13 +320,21 @@ size_t keyboard_readline(char* buffer, size_t max_length) {
         if (c == '\n') {
             break;
         } else if (c == '\b') {
-            /* Handle backspace - character was already removed from display */
+            /* Handle backspace */
             if (pos > 0) {
                 pos--;
+                terminal_backspace();  /* Handle display */
             }
         } else if (c >= 32 && c <= 126) {
-            /* Printable character - already displayed */
+            /* Printable character */
             buffer[pos++] = c;
+            terminal_putchar(c);  /* Handle display */
+            terminal_update_cursor();
+        } else if (c == '\t') {
+            /* Tab character */
+            buffer[pos++] = c;
+            terminal_putchar(c);  /* Handle display */
+            terminal_update_cursor();
         }
     }
     

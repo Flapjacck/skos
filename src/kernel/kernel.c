@@ -215,8 +215,12 @@ void kernel_main(void) {
                 } else if (c == '\b') {
                     /* Handle backspace */
                     terminal_backspace();
-                } else {
-                    /* Echo character */
+                } else if (c >= 32 && c <= 126) {
+                    /* Echo printable character */
+                    terminal_putchar(c);
+                    terminal_update_cursor();
+                } else if (c == '\t') {
+                    /* Echo tab character */
                     terminal_putchar(c);
                     terminal_update_cursor();
                 }
