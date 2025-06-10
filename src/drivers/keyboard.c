@@ -35,20 +35,28 @@ static input_buffer_t input_buffer = {0};
  *------------------------------------------------------------------------------
  */
 
+/* PS/2 Scancode Set 1 to ASCII mapping table (US QWERTY) */
 static const char scancode_to_ascii_table[128] = {
-    0,    0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', /* 0x00-0x0E */
-    '\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',    /* 0x0F-0x1C */
-    0,    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',          /* 0x1D-0x29 */
-    0,    '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0,            /* 0x2A-0x36 */
-    '*',  0,   ' '                                                               /* 0x37-0x39 */
+/*00*/ 0,    0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
+/*0F*/ '\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',
+/*1D*/ 0,    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',
+/*2A*/ 0,    '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0,
+/*37*/ '*',  0,   ' ', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   /* 0x37-0x46 */
+/*47*/ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,         /* 0x47-0x56 */
+/*57*/ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,         /* 0x57-0x66 */
+/*67*/ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0          /* 0x67-0x76 */
 };
 
+/* PS/2 Scancode Set 1 to ASCII mapping table (US QWERTY - Shift) */
 static const char scancode_to_ascii_shift_table[128] = {
-    0,    0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b', /* 0x00-0x0E */
-    '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n',    /* 0x0F-0x1C */
-    0,    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~',          /* 0x1D-0x29 */
-    0,    '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0,            /* 0x2A-0x36 */
-    '*',  0,   ' '                                                               /* 0x37-0x39 */
+/*00*/ 0,    0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',
+/*0F*/ '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n',
+/*1D*/ 0,    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~',
+/*2A*/ 0,    '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0,
+/*37*/ '*',  0,   ' ', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   /* 0x37-0x46 */
+/*47*/ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,         /* 0x47-0x56 */
+/*57*/ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,         /* 0x57-0x66 */
+/*67*/ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0          /* 0x67-0x76 */
 };
 
 /*------------------------------------------------------------------------------
@@ -178,6 +186,17 @@ void keyboard_init(void) {
         return;
     }
     
+    /* Set scancode set 1 */
+    if (keyboard_send_command(KB_CMD_SET_SCANCODE_SET)) {
+        keyboard_wait_input();
+        outb(PS2_DATA_PORT, 1);  /* Use scancode set 1 */
+        keyboard_wait_output();
+        uint8_t ack = inb(PS2_DATA_PORT);
+        if (ack != 0xFA) {
+            /* Command failed, but continue anyway */
+        }
+    }
+    
     /* Enable scanning */
     keyboard_send_command(KB_CMD_ENABLE_SCANNING);
     
@@ -189,55 +208,100 @@ void keyboard_interrupt_handler(void) {
     /* Read scancode from keyboard */
     uint8_t scancode = inb(PS2_DATA_PORT);
     
-    /* Handle extended scancodes */
+    /* Handle scancode set 2 break codes (0xF0 prefix) */
+    if (scancode == 0xF0) {
+        keyboard_state.extended_scancode = true;  /* Reuse this flag for break codes */
+        return;
+    }
+    
+    /* Handle extended scancodes (0xE0 prefix) */
     if (scancode == SCANCODE_EXTENDED) {
         keyboard_state.extended_scancode = true;
         return;
     }
     
-    /* Check if this is a key release */
-    bool key_released = (scancode & SCANCODE_RELEASE) != 0;
-    if (key_released) {
-        scancode &= ~SCANCODE_RELEASE;
+    /* Check if this was a break code (key release) */
+    if (keyboard_state.extended_scancode && scancode != SCANCODE_EXTENDED) {
+        /* This is a key release, ignore it */
+        keyboard_state.extended_scancode = false;
+        return;
     }
     
-    /* Handle modifier keys */
-    if (!keyboard_state.extended_scancode) {
+    /* Check if this is a Set 1 key release (bit 7 set) */
+    bool key_released = (scancode & 0x80) != 0;
+    if (key_released) {
+        scancode &= 0x7F;  /* Remove release bit */
+        /* Handle modifier key releases */
         switch (scancode) {
             case 0x2A: /* Left Shift */
             case 0x36: /* Right Shift */
-                keyboard_state.shift_pressed = !key_released;
-                keyboard_state.extended_scancode = false;
-                return;
-                
+                keyboard_state.shift_pressed = false;
+                break;
             case 0x1D: /* Ctrl */
-                keyboard_state.ctrl_pressed = !key_released;
-                keyboard_state.extended_scancode = false;
-                return;
-                
+                keyboard_state.ctrl_pressed = false;
+                break;
             case 0x38: /* Alt */
-                keyboard_state.alt_pressed = !key_released;
-                keyboard_state.extended_scancode = false;
-                return;
-                
-            case 0x3A: /* Caps Lock */
-                if (!key_released) {
-                    keyboard_state.caps_lock = !keyboard_state.caps_lock;
-                    keyboard_update_leds();
-                }
-                keyboard_state.extended_scancode = false;
-                return;
+                keyboard_state.alt_pressed = false;
+                break;
         }
+        keyboard_state.extended_scancode = false;
+        return;  /* Don't process key releases for regular keys */
+    }
+    
+    
+    /* Handle modifier key presses */
+    switch (scancode) {
+        case 0x2A: /* Left Shift */
+        case 0x36: /* Right Shift */
+            keyboard_state.shift_pressed = true;
+            keyboard_state.extended_scancode = false;
+            return;
+            
+        case 0x1D: /* Ctrl */
+            keyboard_state.ctrl_pressed = true;
+            keyboard_state.extended_scancode = false;
+            return;
+            
+        case 0x38: /* Alt */
+            keyboard_state.alt_pressed = true;
+            keyboard_state.extended_scancode = false;
+            return;
+            
+        case 0x3A: /* Caps Lock */
+            keyboard_state.caps_lock = !keyboard_state.caps_lock;
+            keyboard_update_leds();
+            keyboard_state.extended_scancode = false;
+            return;
     }
     
     /* Reset extended scancode flag */
     keyboard_state.extended_scancode = false;
     
-    /* Only process key press events for regular keys */
-    if (!key_released) {
-        char ascii = scancode_to_ascii(scancode);
-        if (ascii != 0) {
+    /* Convert scancode to ASCII */
+    char ascii = scancode_to_ascii(scancode);
+    
+    if (ascii != 0) {
+        /* Handle backspace immediately for better user experience */
+        if (ascii == '\b') {
+            /* Only process backspace if there are characters in the buffer */
+            if (input_buffer.count > 0) {
+                /* Remove last character from buffer */
+                if (input_buffer.write_pos == 0) {
+                    input_buffer.write_pos = KEYBOARD_BUFFER_SIZE - 1;
+                } else {
+                    input_buffer.write_pos--;
+                }
+                input_buffer.count--;
+                
+                /* Update display */
+                terminal_backspace();
+            }
+        } else {
+            /* Regular character - add to buffer and display */
             input_buffer_put(ascii);
+            if (ascii >= 32 && ascii <= 126) { /* Printable characters */
+                terminal_putchar(ascii);
+            }
         }
     }
 }
@@ -289,15 +353,13 @@ size_t keyboard_readline(char* buffer, size_t max_length) {
         if (c == '\n') {
             break;
         } else if (c == '\b') {
-            /* Handle backspace */
+            /* Handle backspace - character was already removed from display */
             if (pos > 0) {
                 pos--;
-                terminal_backspace();
             }
         } else if (c >= 32 && c <= 126) {
-            /* Printable character */
+            /* Printable character - already displayed */
             buffer[pos++] = c;
-            terminal_putchar(c);
         }
     }
     

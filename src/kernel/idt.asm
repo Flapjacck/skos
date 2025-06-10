@@ -475,8 +475,9 @@ isr_common_stub:
     mov fs, ax              ; Set F segment
     mov gs, ax              ; Set G segment
     
+    push esp                ; Push pointer to interrupt_registers_t structure
     call interrupt_handler  ; Call our C interrupt handler
-                            ; ESP is automatically passed as parameter
+    add esp, 4              ; Clean up parameter from stack
     
     pop eax                 ; Restore original data segment
     mov ds, ax
@@ -508,7 +509,9 @@ irq_common_stub:
     mov fs, ax
     mov gs, ax
     
+    push esp                ; Push pointer to interrupt_registers_t structure
     call interrupt_handler  ; Call our C interrupt handler
+    add esp, 4              ; Clean up parameter from stack
     
     pop eax                 ; Restore original data segment
     mov ds, ax

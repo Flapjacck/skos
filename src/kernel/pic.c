@@ -1,4 +1,5 @@
 #include "pic.h"
+#include <stdbool.h>
 
 /*------------------------------------------------------------------------------
  * I/O Port Helper Functions
@@ -281,4 +282,32 @@ uint8_t pic_read_irr_slave(void) {
      */
     outb(PIC2_COMMAND, 0x0A);  /* OCW3: Read IRR */
     return inb(PIC2_COMMAND);
+}
+
+bool pic_is_spurious_irq(uint8_t irq) {
+    /*--------------------------------------------------------------------------
+     * Check if an IRQ is spurious
+     *--------------------------------------------------------------------------
+     * Spurious IRQs occur when an IRQ signal disappears between the PIC 
+     * notifying the CPU and the CPU reading the interrupt vector. For spurious
+     * IRQs, the corresponding bit in the ISR will NOT be set.
+     * 
+     * IRQ 7 (master): Check master PIC ISR bit 7
+     * IRQ 15 (slave): Check slave PIC ISR bit 7 (IRQ 15 is bit 7 on slave)
+     *--------------------------------------------------------------------------
+     */
+    
+    if (irq == 7) {
+        /* Check master PIC ISR for IRQ 7 */
+        uint8_t isr = pic_read_isr_master();
+        return !(isr & (1 << 7));  /* If bit 7 is NOT set, it's spurious */
+    } 
+    else if (irq == 15) {
+        /* Check slave PIC ISR for IRQ 15 (bit 7 on slave) */
+        uint8_t isr = pic_read_isr_slave();
+        return !(isr & (1 << 7));  /* If bit 7 is NOT set, it's spurious */
+    }
+    
+    /* For other IRQs, they're not typically spurious */
+    return false;
 }

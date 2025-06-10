@@ -416,12 +416,53 @@ void interrupt_handler(interrupt_registers_t *regs)
         /* This is a hardware IRQ */
         uint32_t irq_num = regs->int_no - 32;
         
+        /* Check for spurious IRQs first */
+        if ((irq_num == 7 || irq_num == 15) && pic_is_spurious_irq(irq_num)) {
+            /* Handle spurious IRQ */
+            terminal_setcolor(vga_entry_color(VGA_COLOR_MAGENTA, VGA_COLOR_BLACK));
+            terminal_writestring("Spurious IRQ ");
+            
+            /* Convert IRQ number to string */
+            char num_str[16];
+            int i = 0;
+            if (irq_num == 0) {
+                num_str[i++] = '0';
+            } else {
+                uint32_t temp_irq = irq_num;
+                while (temp_irq > 0) {
+                    num_str[i++] = '0' + (temp_irq % 10);
+                    temp_irq /= 10;
+                }
+                /* Reverse the string */
+                for (int j = 0; j < i / 2; j++) {
+                    char temp = num_str[j];
+                    num_str[j] = num_str[i - 1 - j];
+                    num_str[i - 1 - j] = temp;
+                }
+            }
+            num_str[i] = '\0';
+            terminal_writestring(num_str);
+            terminal_writestring(" detected\n");
+            
+            /* For spurious IRQ15, still need to send EOI to master */
+            if (irq_num == 15) {
+                pic_send_eoi(0);  /* Send EOI to master only */
+            }
+            /* For spurious IRQ7, don't send any EOI */
+            
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+            return;
+        }
+        
         /* Handle specific IRQs */
         if (irq_num == 1) {
             /* IRQ1: Keyboard interrupt */
             keyboard_interrupt_handler();
+        } else if (irq_num == 0) {
+            /* IRQ0: Timer interrupt - handle silently to avoid spam */
+            /* Timer interrupts are expected and frequent */
         } else {
-            /* Generic IRQ handling for debugging */
+            /* Generic IRQ handling for debugging - show other IRQs */
             terminal_setcolor(vga_entry_color(VGA_COLOR_BROWN, VGA_COLOR_BLACK));
             terminal_writestring("Received IRQ: ");
             
@@ -431,9 +472,10 @@ void interrupt_handler(interrupt_registers_t *regs)
             if (irq_num == 0) {
                 num_str[i++] = '0';
             } else {
-                while (irq_num > 0) {
-                    num_str[i++] = '0' + (irq_num % 10);
-                    irq_num /= 10;
+                uint32_t temp_irq = irq_num;
+                while (temp_irq > 0) {
+                    num_str[i++] = '0' + (temp_irq % 10);
+                    temp_irq /= 10;
                 }
                 /* Reverse the string */
                 for (int j = 0; j < i / 2; j++) {
@@ -449,7 +491,7 @@ void interrupt_handler(interrupt_registers_t *regs)
             terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
         }
         
-        /* Send End of Interrupt (EOI) to PIC */
+        /* Send End of Interrupt (EOI) to PIC for real IRQs */
         pic_send_eoi(irq_num);
     }
     
@@ -459,28 +501,30 @@ void interrupt_handler(interrupt_registers_t *regs)
      */
     else {
         terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
-        terminal_writestring("Received interrupt: ");
+        terminal_writestring("Received interrupt: 0x");
         
-        /* Convert interrupt number to string */
-        char num_str[16];
-        int i = 0;
+        /* Convert interrupt number to hex string */
         uint32_t num = regs->int_no;
-        if (num == 0) {
-            num_str[i++] = '0';
-        } else {
-            while (num > 0) {
-                num_str[i++] = '0' + (num % 10);
-                num /= 10;
-            }
-            /* Reverse the string */
-            for (int j = 0; j < i / 2; j++) {
-                char temp = num_str[j];
-                num_str[j] = num_str[i - 1 - j];
-                num_str[i - 1 - j] = temp;
-            }
+        for (int shift = 28; shift >= 0; shift -= 4) {
+            int digit = (num >> shift) & 0xF;
+            terminal_putchar(digit < 10 ? '0' + digit : 'A' + digit - 10);
         }
-        num_str[i] = '\0';
-        terminal_writestring(num_str);
+        terminal_writestring(", err_code: 0x");
+        
+        /* Convert error code to hex string */
+        num = regs->err_code;
+        for (int shift = 28; shift >= 0; shift -= 4) {
+            int digit = (num >> shift) & 0xF;
+            terminal_putchar(digit < 10 ? '0' + digit : 'A' + digit - 10);
+        }
+        terminal_writestring(", EIP: 0x");
+        
+        /* Convert EIP to hex string */
+        num = regs->eip;
+        for (int shift = 28; shift >= 0; shift -= 4) {
+            int digit = (num >> shift) & 0xF;
+            terminal_putchar(digit < 10 ? '0' + digit : 'A' + digit - 10);
+        }
         terminal_writestring("\n");
         
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));

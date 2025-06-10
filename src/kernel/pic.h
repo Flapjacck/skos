@@ -2,6 +2,7 @@
 #define PIC_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*------------------------------------------------------------------------------
  * 8259 Programmable Interrupt Controller (PIC) Definitions
@@ -215,5 +216,17 @@ uint8_t pic_read_irr_master(void);
  *                 1 = IRQ has been raised, 0 = IRQ has not been raised
  */
 uint8_t pic_read_irr_slave(void);
+
+/**
+ * @brief Checks if an IRQ is spurious
+ * 
+ * Spurious IRQs can occur when an IRQ signal disappears between the PIC 
+ * notifying the CPU and the CPU acknowledging the interrupt. This function
+ * checks the ISR to determine if the IRQ is real or spurious.
+ * 
+ * @param irq The IRQ number (0-15) to check
+ * @return true if the IRQ is spurious, false if it's real
+ */
+bool pic_is_spurious_irq(uint8_t irq);
 
 #endif /* PIC_H */
