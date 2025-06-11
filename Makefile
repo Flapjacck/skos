@@ -12,7 +12,8 @@ KERNEL_OBJS = \
 	idt.o \
 	idt_asm.o \
 	pic.o \
-	keyboard.o
+	keyboard.o \
+	memory.o
 
 # Default target
 all: myos.iso
@@ -48,6 +49,10 @@ pic.o: src/kernel/pic.c
 # Compile keyboard driver
 keyboard.o: src/drivers/keyboard.c
 	$(CC) $(CFLAGS) -c src/drivers/keyboard.c -o keyboard.o
+
+# Compile memory manager
+memory.o: src/kernel/memory.c
+	$(CC) $(CFLAGS) -c src/kernel/memory.c -o memory.o
 
 # Link the kernel
 myos.bin: $(KERNEL_OBJS)

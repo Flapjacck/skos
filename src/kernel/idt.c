@@ -17,6 +17,7 @@
 #include "gdt.h"     /* For KERNEL_CODE_SELECTOR */
 #include "kernel.h"  /* For terminal output functions */
 #include "pic.h"     /* For PIC EOI handling */
+#include "memory.h"  /* For page fault handling */
 
 /*------------------------------------------------------------------------------
  * IDT Global Variables
@@ -329,6 +330,12 @@ void interrupt_handler(interrupt_registers_t *regs)
      * it detects an error or exceptional condition during instruction execution.
      */
     if (regs->int_no < 32) {
+        /* Handle page faults specially */
+        if (regs->int_no == IDT_PAGE_FAULT) {
+            page_fault_handler(regs->err_code);
+            return;
+        }
+        
         /* Display exception information */
         terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_RED));
         terminal_writestring("\n*** KERNEL PANIC ***\n");

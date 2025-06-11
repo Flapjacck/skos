@@ -39,6 +39,10 @@ _start:
     ; Set up the stack
     mov esp, stack_top
 
+    ; Push multiboot information for kernel
+    push ebx  ; Multiboot information structure
+    push eax  ; Multiboot magic number
+
     ; This is where we call the C function from our kernel
     extern kernel_main ; Declare that we will be referencing the external kernel_main symbol
     call kernel_main  ; Call our main kernel function

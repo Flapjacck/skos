@@ -15,6 +15,7 @@
 #include "gdt.h"
 #include "idt.h"
 #include "pic.h"
+#include "memory.h"
 
 /* Global variables for terminal state */
 size_t terminal_row;
@@ -151,9 +152,16 @@ void terminal_start_input(void) {
 }
 
 /* Kernel main function */
-void kernel_main(void) {
+void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     /* Initialize terminal interface first for debug output */
     terminal_initialize();
+
+    /* Check multiboot magic number */
+    if (magic != 0x2BADB002) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+        terminal_writestring("ERROR: Invalid multiboot magic number!\n");
+        while(1) asm volatile("hlt");
+    }
 
     /* Display startup message */
     terminal_writestring("SKOS Kernel Starting...\n");
@@ -181,6 +189,13 @@ void kernel_main(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Initializing Keyboard... ");
     keyboard_init();
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
+    /* Initialize Memory Management */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Memory Management... ");
+    memory_init(mboot_info);
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     

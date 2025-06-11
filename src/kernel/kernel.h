@@ -17,6 +17,9 @@
 /* Include keyboard driver definitions */
 #include "../drivers/keyboard.h"
 
+/* Forward declarations for multiboot */
+typedef struct multiboot_info multiboot_info_t;
+
 /*------------------------------------------------------------------------------
  * VGA Text Mode Color Constants
  *------------------------------------------------------------------------------
