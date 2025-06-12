@@ -22,6 +22,7 @@ size_t terminal_row;
 size_t terminal_column;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
+size_t prompt_start_column;  /* Track where the prompt starts to prevent deletion */
 
 /* Implementation of kernel functions */
 
@@ -137,7 +138,8 @@ void terminal_clear_line_from_cursor(void) {
 
 /* Handle backspace operation */
 void terminal_backspace(void) {
-    if (terminal_column > 0) {
+    /* Only allow backspace if we're not at the start of the prompt */
+    if (terminal_column > prompt_start_column) {
         terminal_column--;
         terminal_putentryat(' ', terminal_color, terminal_column, terminal_row);
         terminal_update_cursor();
@@ -146,7 +148,8 @@ void terminal_backspace(void) {
 
 /* Initialize keyboard input mode */
 void terminal_start_input(void) {
-    terminal_writestring("\n$ ");  /* Show prompt */
+    terminal_writestring("\nskos~$ ");  /* Show prompt */
+    prompt_start_column = terminal_column;  /* Remember where user input starts */
     terminal_show_cursor();
     terminal_update_cursor();
 }
@@ -225,7 +228,8 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
             if (c != 0) {
                 if (c == '\n') {
                     /* Handle enter key - start new line with prompt */
-                    terminal_writestring("\n$ ");
+                    terminal_writestring("\nskos~$ ");
+                    prompt_start_column = terminal_column;  /* Update prompt position */
                     terminal_update_cursor();
                 } else if (c == '\b') {
                     /* Handle backspace */
