@@ -126,9 +126,19 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y);
  * This function:
  * 1. Resets the column position to 0
  * 2. Increments the row position
- * 3. Implements wrapping when reaching bottom of screen
+ * 3. Scrolls the screen up when reaching bottom of screen
  */
 void terminal_newline(void);
+
+/**
+ * @brief Scrolls the terminal screen up by one line
+ * 
+ * This function:
+ * 1. Moves all lines up by one position
+ * 2. Clears the bottom line
+ * 3. Is called when the terminal reaches the bottom of the screen
+ */
+void terminal_scroll(void);
 
 /**
  * @brief Outputs a single character to the terminal
