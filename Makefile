@@ -13,6 +13,7 @@ KERNEL_OBJS = \
 	idt_asm.o \
 	pic.o \
 	keyboard.o \
+	shell.o \
 	memory.o
 
 # Default target
@@ -49,6 +50,10 @@ pic.o: src/kernel/pic.c
 # Compile keyboard driver
 keyboard.o: src/drivers/keyboard.c
 	$(CC) $(CFLAGS) -c src/drivers/keyboard.c -o keyboard.o
+
+# Compile shell driver
+shell.o: src/drivers/shell.c
+	$(CC) $(CFLAGS) -c src/drivers/shell.c -o shell.o
 
 # Compile memory manager
 memory.o: src/kernel/memory.c

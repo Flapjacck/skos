@@ -217,6 +217,13 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     
+    /* Initialize Shell Driver */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Shell... ");
+    shell_init();
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
     /* Initialize Memory Management */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Initializing Memory Management... ");
@@ -248,23 +255,8 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
         if (keyboard_has_data()) {
             char c = keyboard_getchar();
             if (c != 0) {
-                if (c == '\n') {
-                    /* Handle enter key - start new line with prompt */
-                    terminal_writestring("\nskos~$ ");
-                    prompt_start_column = terminal_column;  /* Update prompt position */
-                    terminal_update_cursor();
-                } else if (c == '\b') {
-                    /* Handle backspace */
-                    terminal_backspace();
-                } else if (c >= 32 && c <= 126) {
-                    /* Echo printable character */
-                    terminal_putchar(c);
-                    terminal_update_cursor();
-                } else if (c == '\t') {
-                    /* Echo tab character */
-                    terminal_putchar(c);
-                    terminal_update_cursor();
-                }
+                /* Let the shell handle all input processing */
+                shell_handle_input(c);
             }
         }
         
