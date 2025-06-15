@@ -16,6 +16,7 @@
 #include "idt.h"
 #include "pic.h"
 #include "memory.h"
+#include "../drivers/timer.h"
 
 /* Global variables for terminal state */
 size_t terminal_row;
@@ -223,6 +224,14 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Initializing PIC... ");
     pic_init();
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
+    /* Initialize Timer */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Timer... ");
+    timer_init();
+    pic_unmask_irq(0);  /* Enable timer interrupts (IRQ 0) */
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     

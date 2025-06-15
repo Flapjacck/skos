@@ -17,6 +17,9 @@ void shell_handle_input(char c);
 void shell_cmd_help(void);
 void shell_cmd_clear(void);
 void shell_cmd_mem(void);
+void shell_cmd_uptime(void);
+void shell_cmd_timer(void);
+void shell_cmd_sleep(void);
 
 /* Utility functions */
 void shell_print_prompt(void);

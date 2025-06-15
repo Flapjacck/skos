@@ -18,6 +18,7 @@
 #include "kernel.h"  /* For terminal output functions */
 #include "pic.h"     /* For PIC EOI handling */
 #include "memory.h"  /* For page fault handling */
+#include "../drivers/timer.h"  /* For timer interrupt handling */
 
 /*------------------------------------------------------------------------------
  * IDT Global Variables
@@ -466,8 +467,8 @@ void interrupt_handler(interrupt_registers_t *regs)
             /* IRQ1: Keyboard interrupt */
             keyboard_interrupt_handler();
         } else if (irq_num == 0) {
-            /* IRQ0: Timer interrupt - handle silently to avoid spam */
-            /* Timer interrupts are expected and frequent */
+            /* IRQ0: Timer interrupt - handle timer ticks */
+            timer_interrupt_handler();
         } else {
             /* Generic IRQ handling for debugging - show other IRQs */
             terminal_setcolor(vga_entry_color(VGA_COLOR_BROWN, VGA_COLOR_BLACK));

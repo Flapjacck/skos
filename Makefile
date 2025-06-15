@@ -14,7 +14,8 @@ KERNEL_OBJS = \
 	pic.o \
 	keyboard.o \
 	shell.o \
-	memory.o
+	memory.o \
+	timer.o
 
 # Default target
 all: myos.iso
@@ -54,6 +55,10 @@ keyboard.o: src/drivers/keyboard.c
 # Compile shell driver
 shell.o: src/drivers/shell.c
 	$(CC) $(CFLAGS) -c src/drivers/shell.c -o shell.o
+
+# Compile timer driver
+timer.o: src/drivers/timer.c
+	$(CC) $(CFLAGS) -c src/drivers/timer.c -o timer.o
 
 # Compile memory manager
 memory.o: src/kernel/memory.c
