@@ -170,7 +170,10 @@ void terminal_backspace(void) {
 
 /* Initialize keyboard input mode */
 void terminal_start_input(void) {
-    terminal_writestring("\nskos~$ ");  /* Show prompt */
+    terminal_writestring("\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Type 'help' for available commands or start typing a command.\n\n");
+    terminal_writestring("skos~$ ");  /* Show prompt */
     prompt_start_column = terminal_column;  /* Remember where user input starts */
     terminal_show_cursor();
     terminal_update_cursor();
@@ -188,9 +191,22 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
         while(1) asm volatile("hlt");
     }
 
-    /* Display startup message */
-    terminal_writestring("SKOS Kernel Starting...\n");
-      /* Initialize Global Descriptor Table (GDT) */
+    /* Display SKOS ASCII art banner */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n");
+    terminal_writestring("  ____  _  _   ____  ____ \n");
+    terminal_writestring(" / ___|| |/ / / __ \\/ ___|\n");
+    terminal_writestring(" \\___ \\| ' / | |  | \\___ \\\n");
+    terminal_writestring("  ___) | . \\ | |__| |___) |\n");
+    terminal_writestring(" |____/|_|\\_\\ \\____/|____/\n");
+    terminal_writestring("\n");
+    
+    /* Boot sequence header */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("=== SYSTEM INITIALIZATION ===\n\n");
+    
+    /* Initialize Global Descriptor Table (GDT) */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Initializing GDT... ");
     gdt_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
@@ -210,6 +226,13 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     
+    /* Initialize Memory Management */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing Memory... ");
+    memory_init(mboot_info);
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("OK\n");
+    
     /* Initialize Keyboard Driver */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Initializing Keyboard... ");
@@ -224,13 +247,6 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     
-    /* Initialize Memory Management */
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Memory Management... ");
-    memory_init(mboot_info);
-    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("OK\n");
-    
     /* Enable interrupts */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     terminal_writestring("Enabling interrupts... ");
@@ -238,12 +254,12 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     
-    /* Reset color and display welcome message */
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    /* Boot complete message */
+    terminal_writestring("\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+    terminal_writestring("=== SYSTEM READY ===\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     terminal_writestring("Welcome to SKOS!\n");
-    terminal_writestring("A bare bones operating system\n");
-    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("System initialized successfully.\n");
     
     /* Start keyboard input mode */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));

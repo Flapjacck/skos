@@ -86,11 +86,11 @@ void shell_print_prompt(void) {
 /* Help command - shows all available commands */
 void shell_cmd_help(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("SKOS Shell - Available Commands:\n");
+    terminal_writestring("\n=== SKOS SHELL COMMANDS ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
-        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
         terminal_writestring("  ");
         terminal_writestring(commands[i].name);
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -110,7 +110,7 @@ void shell_cmd_clear(void) {
 /* Memory command - shows memory information */
 void shell_cmd_mem(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("Memory Information:\n");
+    terminal_writestring("\n=== MEMORY INFORMATION ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
     
     /* Call the memory management function to print detailed stats */
@@ -128,11 +128,7 @@ void shell_init(void) {
     command_length = 0;
     command_buffer[0] = '\0';
     
-    /* Display shell welcome message */
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("SKOS Shell initialized\n");
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Type 'help' for available commands\n\n");
+    /* Shell is now ready - no need for verbose messages during boot */
 }
 
 /* Process a complete command */
