@@ -38,7 +38,7 @@ sudo dnf install gcc nasm qemu grub2-tools xorriso
 ## Quick Start
 
 ```bash
-git clone <repository-url>
+git clone <Insert repository-url here> # add repository URL
 cd skos
 make          # Build kernel and create ISO
 make run      # Launch in QEMU
