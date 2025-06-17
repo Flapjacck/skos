@@ -9,7 +9,18 @@
 #include "shell.h"
 #include "../kernel/kernel.h"
 #include "../kernel/memory.h"
+#include "../kernel/pic.h"
 #include "timer.h"
+
+/* Forward declarations for helper functions */
+static void print_hex32(uint32_t value);
+static void print_hex16(uint16_t value);
+static void print_hex8(uint8_t value);
+
+/* I/O port functions (inline assembly) */
+static inline void outb(uint16_t port, uint8_t value) {
+    asm volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
+}
 
 /*------------------------------------------------------------------------------
  * Helper Functions for 64-bit Arithmetic
@@ -91,7 +102,12 @@ static const shell_command_t commands[] = {
     {"mem", shell_cmd_mem, "Show memory information"},
     {"uptime", shell_cmd_uptime, "Show system uptime"},
     {"timer", shell_cmd_timer, "Show timer information"},
-    {"sleep", shell_cmd_sleep, "Sleep for 3 seconds (demo)"}
+    {"sleep", shell_cmd_sleep, "Sleep for 3 seconds (demo)"},
+    {"cpuid", shell_cmd_cpuid, "Show CPU information and features"},
+    {"regs", shell_cmd_regs, "Show CPU register information"},
+    {"irq", shell_cmd_irq, "Show interrupt controller status"},
+    {"echo", shell_cmd_echo, "Echo text back"},
+    {"reboot", shell_cmd_reboot, "Reboot the system"}
 };
 
 #define NUM_COMMANDS (sizeof(commands) / sizeof(commands[0]))
@@ -417,6 +433,268 @@ void shell_cmd_sleep(void) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Sleep complete!\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+}
+
+/* CPUID command - shows CPU information and features */
+void shell_cmd_cpuid(void) {
+    uint32_t eax, ebx, ecx, edx;
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== CPU INFORMATION ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Get vendor string */
+    asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(0));
+    
+    terminal_writestring("  Vendor ID: ");
+    char vendor[13] = {0};
+    *(uint32_t*)(vendor + 0) = ebx;
+    *(uint32_t*)(vendor + 4) = edx;
+    *(uint32_t*)(vendor + 8) = ecx;
+    terminal_writestring(vendor);
+    terminal_writestring("\n");
+    
+    /* Get CPU features */
+    if (eax >= 1) {
+        asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+        
+        terminal_writestring("  Model: ");
+        uint32_t model = (eax >> 4) & 0xF;
+        uint32_t family = (eax >> 8) & 0xF;
+        char model_str[16];
+        int i = 0;
+        if (family == 0) family = 15; /* Extended family */
+        uint32_t temp = family;
+        while (temp > 0) {
+            model_str[i++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+        /* Reverse string */
+        for (int j = 0; j < i/2; j++) {
+            char temp_c = model_str[j];
+            model_str[j] = model_str[i-1-j];
+            model_str[i-1-j] = temp_c;
+        }
+        model_str[i] = '\0';
+        terminal_writestring(model_str);
+        terminal_writestring(".");
+        
+        i = 0;
+        temp = model;
+        if (temp == 0) {
+            model_str[i++] = '0';
+        } else {
+            while (temp > 0) {
+                model_str[i++] = '0' + (temp % 10);
+                temp /= 10;
+            }
+            /* Reverse string */
+            for (int j = 0; j < i/2; j++) {
+                char temp_c = model_str[j];
+                model_str[j] = model_str[i-1-j];
+                model_str[i-1-j] = temp_c;
+            }
+        }
+        model_str[i] = '\0';
+        terminal_writestring(model_str);
+        terminal_writestring("\n");
+        
+        terminal_writestring("  Features: ");
+        if (edx & (1 << 0)) terminal_writestring("FPU ");
+        if (edx & (1 << 4)) terminal_writestring("TSC ");
+        if (edx & (1 << 5)) terminal_writestring("MSR ");
+        if (edx & (1 << 6)) terminal_writestring("PAE ");
+        if (edx & (1 << 8)) terminal_writestring("CX8 ");
+        if (edx & (1 << 9)) terminal_writestring("APIC ");
+        if (edx & (1 << 15)) terminal_writestring("CMOV ");
+        if (edx & (1 << 23)) terminal_writestring("MMX ");
+        if (edx & (1 << 25)) terminal_writestring("SSE ");
+        if (edx & (1 << 26)) terminal_writestring("SSE2 ");
+        if (ecx & (1 << 0)) terminal_writestring("SSE3 ");
+        terminal_writestring("\n");
+    }
+    
+    terminal_writestring("\n");
+}
+
+/* Register command - shows CPU register information */
+void shell_cmd_regs(void) {
+    uint32_t eax, ebx, ecx, edx, esp, ebp, esi, edi;
+    uint32_t cr0, cr2, cr3;
+    uint16_t cs, ds, es, fs, gs, ss;
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== CPU REGISTERS ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Get general purpose registers */
+    asm volatile("mov %%eax, %0" : "=m"(eax));
+    asm volatile("mov %%ebx, %0" : "=m"(ebx));
+    asm volatile("mov %%ecx, %0" : "=m"(ecx));
+    asm volatile("mov %%edx, %0" : "=m"(edx));
+    asm volatile("mov %%esp, %0" : "=m"(esp));
+    asm volatile("mov %%ebp, %0" : "=m"(ebp));
+    asm volatile("mov %%esi, %0" : "=m"(esi));
+    asm volatile("mov %%edi, %0" : "=m"(edi));
+    
+    /* Get segment registers */
+    asm volatile("mov %%cs, %0" : "=m"(cs));
+    asm volatile("mov %%ds, %0" : "=m"(ds));
+    asm volatile("mov %%es, %0" : "=m"(es));
+    asm volatile("mov %%fs, %0" : "=m"(fs));
+    asm volatile("mov %%gs, %0" : "=m"(gs));
+    asm volatile("mov %%ss, %0" : "=m"(ss));
+    
+    /* Get control registers */
+    asm volatile("mov %%cr0, %%eax; mov %%eax, %0" : "=m"(cr0) : : "eax");
+    asm volatile("mov %%cr2, %%eax; mov %%eax, %0" : "=m"(cr2) : : "eax");
+    asm volatile("mov %%cr3, %%eax; mov %%eax, %0" : "=m"(cr3) : : "eax");
+    
+    /* Print general purpose registers */
+    terminal_writestring("  General Purpose:\n");
+    terminal_writestring("    EAX: 0x"); print_hex32(eax); terminal_writestring("\n");
+    terminal_writestring("    EBX: 0x"); print_hex32(ebx); terminal_writestring("\n");
+    terminal_writestring("    ECX: 0x"); print_hex32(ecx); terminal_writestring("\n");
+    terminal_writestring("    EDX: 0x"); print_hex32(edx); terminal_writestring("\n");
+    terminal_writestring("    ESP: 0x"); print_hex32(esp); terminal_writestring("\n");
+    terminal_writestring("    EBP: 0x"); print_hex32(ebp); terminal_writestring("\n");
+    terminal_writestring("    ESI: 0x"); print_hex32(esi); terminal_writestring("\n");
+    terminal_writestring("    EDI: 0x"); print_hex32(edi); terminal_writestring("\n");
+    
+    /* Print segment registers */
+    terminal_writestring("  Segment Registers:\n");
+    terminal_writestring("    CS: 0x"); print_hex16(cs); terminal_writestring("\n");
+    terminal_writestring("    DS: 0x"); print_hex16(ds); terminal_writestring("\n");
+    terminal_writestring("    ES: 0x"); print_hex16(es); terminal_writestring("\n");
+    terminal_writestring("    FS: 0x"); print_hex16(fs); terminal_writestring("\n");
+    terminal_writestring("    GS: 0x"); print_hex16(gs); terminal_writestring("\n");
+    terminal_writestring("    SS: 0x"); print_hex16(ss); terminal_writestring("\n");
+    
+    /* Print control registers */
+    terminal_writestring("  Control Registers:\n");
+    terminal_writestring("    CR0: 0x"); print_hex32(cr0); terminal_writestring(" (PE=");
+    terminal_writestring((cr0 & 1) ? "1" : "0");
+    terminal_writestring(", PG=");
+    terminal_writestring((cr0 & 0x80000000) ? "1" : "0");
+    terminal_writestring(")\n");
+    terminal_writestring("    CR2: 0x"); print_hex32(cr2); terminal_writestring(" (Page Fault Linear Address)\n");
+    terminal_writestring("    CR3: 0x"); print_hex32(cr3); terminal_writestring(" (Page Directory Base)\n");
+    
+    terminal_writestring("\n");
+}
+
+/* IRQ command - shows interrupt controller status */
+void shell_cmd_irq(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== INTERRUPT CONTROLLER STATUS ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Get PIC mask registers */
+    uint8_t master_mask = pic_get_mask_master();
+    uint8_t slave_mask = pic_get_mask_slave();
+    
+    /* Get PIC ISR registers */
+    uint8_t master_isr = pic_read_isr_master();
+    uint8_t slave_isr = pic_read_isr_slave();
+    
+    /* Get PIC IRR registers */
+    uint8_t master_irr = pic_read_irr_master();
+    uint8_t slave_irr = pic_read_irr_slave();
+    
+    terminal_writestring("  Master PIC (IRQ 0-7):\n");
+    terminal_writestring("    Mask:  0x"); print_hex8(master_mask); terminal_writestring(" (1=disabled)\n");
+    terminal_writestring("    ISR:   0x"); print_hex8(master_isr); terminal_writestring(" (1=in service)\n");
+    terminal_writestring("    IRR:   0x"); print_hex8(master_irr); terminal_writestring(" (1=pending)\n");
+    
+    terminal_writestring("  Slave PIC (IRQ 8-15):\n");
+    terminal_writestring("    Mask:  0x"); print_hex8(slave_mask); terminal_writestring(" (1=disabled)\n");
+    terminal_writestring("    ISR:   0x"); print_hex8(slave_isr); terminal_writestring(" (1=in service)\n");
+    terminal_writestring("    IRR:   0x"); print_hex8(slave_irr); terminal_writestring(" (1=pending)\n");
+    
+    terminal_writestring("  IRQ Status:\n");
+    for (int i = 0; i < 8; i++) {
+        terminal_writestring("    IRQ");
+        char irq_str[8];
+        irq_str[0] = '0' + i;
+        irq_str[1] = ':';
+        irq_str[2] = ' ';
+        irq_str[3] = (master_mask & (1 << i)) ? 'D' : 'E'; /* Disabled/Enabled */
+        irq_str[4] = ' ';
+        irq_str[5] = (master_isr & (1 << i)) ? 'S' : '-';  /* In Service */
+        irq_str[6] = ' ';
+        irq_str[7] = (master_irr & (1 << i)) ? 'P' : '-';  /* Pending */
+        irq_str[8] = '\0';
+        terminal_writestring(irq_str);
+        terminal_writestring("\n");
+    }
+    
+    for (int i = 0; i < 8; i++) {
+        terminal_writestring("    IRQ");
+        char irq_str[16];
+        irq_str[0] = '1';
+        irq_str[1] = '0' + i;
+        irq_str[2] = ':';
+        irq_str[3] = ' ';
+        irq_str[4] = (slave_mask & (1 << i)) ? 'D' : 'E';
+        irq_str[5] = ' ';
+        irq_str[6] = (slave_isr & (1 << i)) ? 'S' : '-';
+        irq_str[7] = ' ';
+        irq_str[8] = (slave_irr & (1 << i)) ? 'P' : '-';
+        irq_str[9] = '\0';
+        terminal_writestring(irq_str);
+        terminal_writestring("\n");
+    }
+    
+    terminal_writestring("\n");
+}
+
+/* Echo command - echoes text back */
+void shell_cmd_echo(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Echo: This is the echo command!\n");
+    terminal_writestring("Note: Argument parsing not yet implemented.\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+}
+
+/* Reboot command - reboots the system */
+void shell_cmd_reboot(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
+    terminal_writestring("Rebooting system...\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Give user a moment to see the message */
+    if (timer_is_initialized()) {
+        timer_sleep_seconds(1);
+    }
+    
+    /* Reboot using keyboard controller */
+    outb(0x64, 0xFE);
+    
+    /* If that doesn't work, try triple fault */
+    asm volatile("cli");
+    asm volatile("hlt");
+}
+
+/* Helper functions for hex printing */
+static void print_hex32(uint32_t value) {
+    for (int i = 28; i >= 0; i -= 4) {
+        int digit = (value >> i) & 0xF;
+        terminal_putchar(digit < 10 ? '0' + digit : 'A' + digit - 10);
+    }
+}
+
+static void print_hex16(uint16_t value) {
+    for (int i = 12; i >= 0; i -= 4) {
+        int digit = (value >> i) & 0xF;
+        terminal_putchar(digit < 10 ? '0' + digit : 'A' + digit - 10);
+    }
+}
+
+static void print_hex8(uint8_t value) {
+    for (int i = 4; i >= 0; i -= 4) {
+        int digit = (value >> i) & 0xF;
+        terminal_putchar(digit < 10 ? '0' + digit : 'A' + digit - 10);
+    }
 }
 
 /*------------------------------------------------------------------------------
