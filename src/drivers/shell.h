@@ -25,6 +25,7 @@ void shell_cmd_regs(void);
 void shell_cmd_irq(void);
 void shell_cmd_echo(void);
 void shell_cmd_reboot(void);
+void shell_cmd_scancode(void);
 
 /* Utility functions */
 void shell_print_prompt(void);

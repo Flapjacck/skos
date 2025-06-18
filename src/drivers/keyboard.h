@@ -112,6 +112,7 @@ typedef struct {
     bool num_lock;              /* Num lock state */
     bool scroll_lock;           /* Scroll lock state */
     bool extended_scancode;     /* Processing extended scancode */
+    bool debug_mode;            /* Scancode debug mode active */
 } keyboard_state_t;
 
 /*------------------------------------------------------------------------------
@@ -212,5 +213,22 @@ bool keyboard_send_command(uint8_t command);
  * @brief Update keyboard LEDs based on current state
  */
 void keyboard_update_leds(void);
+
+/**
+ * @brief Enable scancode debug mode
+ */
+void keyboard_enable_debug_mode(void);
+
+/**
+ * @brief Disable scancode debug mode
+ */
+void keyboard_disable_debug_mode(void);
+
+/**
+ * @brief Check if debug mode is active
+ * 
+ * @return bool True if debug mode is active, false otherwise
+ */
+bool keyboard_is_debug_mode_active(void);
 
 #endif /* KEYBOARD_H */

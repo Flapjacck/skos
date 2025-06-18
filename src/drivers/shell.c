@@ -11,6 +11,7 @@
 #include "../kernel/memory.h"
 #include "../kernel/pic.h"
 #include "timer.h"
+#include "keyboard.h"
 
 /* Forward declarations for helper functions */
 static void print_hex32(uint32_t value);
@@ -107,7 +108,8 @@ static const shell_command_t commands[] = {
     {"regs", shell_cmd_regs, "Show CPU register information"},
     {"irq", shell_cmd_irq, "Show interrupt controller status"},
     {"echo", shell_cmd_echo, "Echo text back"},
-    {"reboot", shell_cmd_reboot, "Reboot the system"}
+    {"reboot", shell_cmd_reboot, "Reboot the system"},
+    {"scancode", shell_cmd_scancode, "Enter scancode debug mode (press q to quit)"}
 };
 
 #define NUM_COMMANDS (sizeof(commands) / sizeof(commands[0]))
@@ -673,6 +675,30 @@ void shell_cmd_reboot(void) {
     /* If that doesn't work, try triple fault */
     asm volatile("cli");
     asm volatile("hlt");
+}
+
+/* Scancode command - enters scancode debug mode */
+void shell_cmd_scancode(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== SCANCODE DEBUG MODE ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Entering scancode debug mode...\n");
+    terminal_writestring("Press any keys to see their scancode details.\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
+    terminal_writestring("Press 'q' to quit debug mode.\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Enable debug mode */
+    keyboard_enable_debug_mode();
+    
+    /* Wait in a loop until debug mode is disabled (by pressing 'q') */
+    while (keyboard_is_debug_mode_active()) {
+        /* Halt CPU until next interrupt */
+        asm volatile ("hlt");
+    }
+    
+    /* Debug mode exited, print prompt */
+    shell_print_prompt();
 }
 
 /* Helper functions for hex printing */
