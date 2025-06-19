@@ -11,7 +11,7 @@
 /* Shell initialization and main functions */
 void shell_init(void);
 void shell_process_command(const char* command);
-void shell_handle_input(char c);
+void shell_handle_input(int c);  /* Changed from char to int to handle special keys */
 
 /* Built-in command functions */
 void shell_cmd_help(void);

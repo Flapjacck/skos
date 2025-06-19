@@ -180,6 +180,36 @@ void terminal_start_input(void) {
     terminal_update_cursor();
 }
 
+/* Move cursor left by one position within input bounds */
+void terminal_move_cursor_left(void) {
+    if (terminal_column > prompt_start_column) {
+        terminal_column--;
+        terminal_update_cursor();
+    }
+}
+
+/* Move cursor right by one position within input bounds */
+void terminal_move_cursor_right(void) {
+    /* Only allow moving right if there's content to move through */
+    /* This will be properly bounded by the shell based on command length */
+    if (terminal_column < VGA_WIDTH - 1) {
+        terminal_column++;
+        terminal_update_cursor();
+    }
+}
+
+/* Move cursor to beginning of input line */
+void terminal_move_cursor_home(void) {
+    terminal_column = prompt_start_column;
+    terminal_update_cursor();
+}
+
+/* Move cursor to end of input line */
+void terminal_move_cursor_end(void) {
+    /* This will be called by shell with proper end position */
+    terminal_update_cursor();
+}
+
 /* Kernel main function */
 void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     /* Initialize terminal interface first for debug output */
@@ -278,7 +308,7 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     while(1) {
         /* Process keyboard input if available */
         if (keyboard_has_data()) {
-            char c = keyboard_getchar();
+            int c = keyboard_getchar();
             if (c != 0) {
                 /* Let the shell handle all input processing */
                 shell_handle_input(c);

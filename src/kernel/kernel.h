@@ -195,4 +195,24 @@ void terminal_backspace(void);
  */
 void terminal_start_input(void);
 
+/**
+ * @brief Move cursor left by one position within input bounds
+ */
+void terminal_move_cursor_left(void);
+
+/**
+ * @brief Move cursor right by one position within input bounds
+ */
+void terminal_move_cursor_right(void);
+
+/**
+ * @brief Move cursor to beginning of input line
+ */
+void terminal_move_cursor_home(void);
+
+/**
+ * @brief Move cursor to end of input line
+ */
+void terminal_move_cursor_end(void);
+
 #endif /* KERNEL_H */

@@ -112,7 +112,7 @@ bool keyboard_send_command(uint8_t command) {
 
 /**
  * @brief Drain any pending data from keyboard output buffer
- * This prevents hangs when data is waiting but interrupts are disabled
+ * This prevents hangs when data are waiting but interrupts are disabled
  */
 static void keyboard_drain_output_buffer(void) {
     int timeout = 1000;
@@ -126,7 +126,7 @@ static void keyboard_drain_output_buffer(void) {
  *------------------------------------------------------------------------------
  */
 
-static void input_buffer_put(char c) {
+static void input_buffer_put(int c) {
     if (input_buffer.count < KEYBOARD_BUFFER_SIZE - 1) {
         input_buffer.buffer[input_buffer.write_pos] = c;
         input_buffer.write_pos = (input_buffer.write_pos + 1) % KEYBOARD_BUFFER_SIZE;
@@ -134,9 +134,9 @@ static void input_buffer_put(char c) {
     }
 }
 
-static char input_buffer_get(void) {
+static int input_buffer_get(void) {
     if (input_buffer.count > 0) {
-        char c = input_buffer.buffer[input_buffer.read_pos];
+        int c = input_buffer.buffer[input_buffer.read_pos];
         input_buffer.read_pos = (input_buffer.read_pos + 1) % KEYBOARD_BUFFER_SIZE;
         input_buffer.count--;
         return c;
@@ -340,13 +340,48 @@ void keyboard_interrupt_handler(void) {
             keyboard_update_leds();
             keyboard_state.extended_scancode = false;
             return;
+            
+        case 0x45: /* Num Lock */
+            keyboard_state.num_lock = !keyboard_state.num_lock;
+            keyboard_update_leds();
+            keyboard_state.extended_scancode = false;
+            return;
+            
+        case 0x46: /* Scroll Lock */
+            keyboard_state.scroll_lock = !keyboard_state.scroll_lock;
+            keyboard_update_leds();
+            keyboard_state.extended_scancode = false;
+            return;
     }
     
+    /* Handle extended scancodes (arrow keys, etc.) */
+    if (keyboard_state.extended_scancode) {
+        switch (scancode) {
+            case SCANCODE_ARROW_UP:
+                input_buffer_put(KEY_ARROW_UP);
+                break;
+            case SCANCODE_ARROW_DOWN:
+                input_buffer_put(KEY_ARROW_DOWN);
+                break;
+            case SCANCODE_ARROW_LEFT:
+                input_buffer_put(KEY_ARROW_LEFT);
+                break;
+            case SCANCODE_ARROW_RIGHT:
+                input_buffer_put(KEY_ARROW_RIGHT);
+                break;
+            default:
+                /* Other extended keys - ignore for now */
+                break;
+        }
+        keyboard_state.extended_scancode = false;
+        return;
+    }
+
     /* Reset extended scancode flag */
     keyboard_state.extended_scancode = false;
     
     /* Convert scancode to ASCII */
-    char ascii = scancode_to_ascii(scancode);
+    int ascii = scancode_to_ascii(scancode);
     
     if (ascii != 0) {
         /* Just add character to buffer - display will be handled by main loop */
@@ -354,12 +389,12 @@ void keyboard_interrupt_handler(void) {
     }
 }
 
-char scancode_to_ascii(uint8_t scancode) {
+int scancode_to_ascii(uint8_t scancode) {
     if (scancode >= 128) {
         return 0;
     }
     
-    char ascii;
+    int ascii;
     
     /* Use shift table if shift is pressed or caps lock affects this key */
     bool use_shift_table = keyboard_state.shift_pressed;
@@ -380,7 +415,7 @@ char scancode_to_ascii(uint8_t scancode) {
     return ascii;
 }
 
-char keyboard_getchar(void) {
+int keyboard_getchar(void) {
     return input_buffer_get();
 }
 
@@ -397,7 +432,7 @@ size_t keyboard_readline(char* buffer, size_t max_length) {
             asm volatile ("hlt");
         }
         
-        char c = keyboard_getchar();
+        int c = keyboard_getchar();
         if (c == '\n') {
             break;
         } else if (c == '\b') {
@@ -408,13 +443,13 @@ size_t keyboard_readline(char* buffer, size_t max_length) {
             }
         } else if (c >= 32 && c <= 126) {
             /* Printable character */
-            buffer[pos++] = c;
-            terminal_putchar(c);  /* Handle display */
+            buffer[pos++] = (char)c;
+            terminal_putchar((char)c);  /* Handle display */
             terminal_update_cursor();
         } else if (c == '\t') {
             /* Tab character */
-            buffer[pos++] = c;
-            terminal_putchar(c);  /* Handle display */
+            buffer[pos++] = (char)c;
+            terminal_putchar((char)c);  /* Handle display */
             terminal_update_cursor();
         }
     }

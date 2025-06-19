@@ -95,6 +95,24 @@
 #define SCANCODE_RELEASE            0x80    /* Key release bit mask */
 
 /*------------------------------------------------------------------------------
+ * Arrow Key Scancodes (when extended with 0xE0 prefix)
+ *------------------------------------------------------------------------------
+ */
+#define SCANCODE_ARROW_UP           0x48    /* Up arrow (E0 48) */
+#define SCANCODE_ARROW_DOWN         0x50    /* Down arrow (E0 50) */
+#define SCANCODE_ARROW_LEFT         0x4B    /* Left arrow (E0 4B) */
+#define SCANCODE_ARROW_RIGHT        0x4D    /* Right arrow (E0 4D) */
+
+/*------------------------------------------------------------------------------
+ * Special Key Codes for Non-ASCII Keys
+ *------------------------------------------------------------------------------
+ */
+#define KEY_ARROW_UP                -1      /* Special key code for up arrow */
+#define KEY_ARROW_DOWN              -2      /* Special key code for down arrow */
+#define KEY_ARROW_LEFT              -3      /* Special key code for left arrow */
+#define KEY_ARROW_RIGHT             -4      /* Special key code for right arrow */
+
+/*------------------------------------------------------------------------------
  * Input Buffer Configuration
  *------------------------------------------------------------------------------
  */
@@ -120,7 +138,7 @@ typedef struct {
  *------------------------------------------------------------------------------
  */
 typedef struct {
-    char buffer[KEYBOARD_BUFFER_SIZE];  /* Character buffer */
+    int buffer[KEYBOARD_BUFFER_SIZE];   /* Character buffer (int to handle special keys) */
     size_t read_pos;                    /* Read position */
     size_t write_pos;                   /* Write position */
     size_t count;                       /* Number of characters in buffer */
@@ -154,16 +172,18 @@ void keyboard_interrupt_handler(void);
  * @brief Convert scancode to ASCII character
  * 
  * @param scancode The scancode received from the keyboard
- * @return char The corresponding ASCII character, or 0 for non-printable keys
+ * @return int The corresponding ASCII character, or 0 for non-printable keys,
+ *             or special key codes for arrow keys (negative values)
  */
-char scancode_to_ascii(uint8_t scancode);
+int scancode_to_ascii(uint8_t scancode);
 
 /**
  * @brief Read a character from the keyboard buffer
  * 
- * @return char The next character from the buffer, or 0 if buffer is empty
+ * @return int The next character from the buffer, or 0 if buffer is empty
+ *              May return special key codes for arrow keys (negative values)
  */
-char keyboard_getchar(void);
+int keyboard_getchar(void);
 
 /**
  * @brief Check if the keyboard buffer has data available

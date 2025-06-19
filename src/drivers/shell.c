@@ -17,6 +17,7 @@
 static void print_hex32(uint32_t value);
 static void print_hex16(uint16_t value);
 static void print_hex8(uint8_t value);
+static void shell_redraw_line(void);
 
 /* I/O port functions (inline assembly) */
 static inline void outb(uint16_t port, uint8_t value) {
@@ -88,6 +89,7 @@ extern size_t prompt_start_column;
 /* Static variables for shell state */
 static char command_buffer[SHELL_MAX_COMMAND_LENGTH];
 static size_t command_length = 0;
+static size_t cursor_position = 0;  /* Cursor position within command buffer */
 
 /* Command table structure */
 typedef struct {
@@ -152,6 +154,28 @@ void shell_print_prompt(void) {
     terminal_writestring("skos~$ ");
     /* Update the prompt start column for backspace handling */
     prompt_start_column = terminal_column;
+    cursor_position = 0;  /* Reset cursor position for new command */
+    terminal_update_cursor();
+}
+
+/* Redraw the current command line */
+static void shell_redraw_line(void) {
+    /* Save current cursor position */
+    size_t saved_cursor_pos = cursor_position;
+    
+    /* Move to start of input area */
+    terminal_move_cursor_home();
+    
+    /* Clear the rest of the line */
+    terminal_clear_line_from_cursor();
+    
+    /* Redraw the command buffer */
+    for (size_t i = 0; i < command_length; i++) {
+        terminal_putchar(command_buffer[i]);
+    }
+    
+    /* Move cursor to correct position */
+    terminal_column = prompt_start_column + saved_cursor_pos;
     terminal_update_cursor();
 }
 
@@ -731,6 +755,7 @@ static void print_hex8(uint8_t value) {
 /* Initialize the shell */
 void shell_init(void) {
     command_length = 0;
+    cursor_position = 0;
     command_buffer[0] = '\0';
     
     /* Shell is now ready - no need for verbose messages during boot */
@@ -765,7 +790,7 @@ void shell_process_command(const char* command) {
 }
 
 /* Handle individual character input */
-void shell_handle_input(char c) {
+void shell_handle_input(int c) {
     if (c == '\n') {
         /* Process the command */
         command_buffer[command_length] = '\0';
@@ -775,21 +800,56 @@ void shell_handle_input(char c) {
         
         /* Reset for next command */
         command_length = 0;
+        cursor_position = 0;
         shell_print_prompt();
         
     } else if (c == '\b') {
-        /* Handle backspace */
-        if (command_length > 0) {
+        /* Handle backspace - delete character to the left of cursor */
+        if (cursor_position > 0) {
+            /* Shift characters left to fill the gap */
+            for (size_t i = cursor_position - 1; i < command_length - 1; i++) {
+                command_buffer[i] = command_buffer[i + 1];
+            }
             command_length--;
-            terminal_backspace();
+            cursor_position--;
+            
+            /* Redraw the line */
+            shell_redraw_line();
         }
         
+    } else if (c == KEY_ARROW_LEFT) {
+        /* Move cursor left */
+        if (cursor_position > 0) {
+            cursor_position--;
+            terminal_move_cursor_left();
+        }
+        
+    } else if (c == KEY_ARROW_RIGHT) {
+        /* Move cursor right */
+        if (cursor_position < command_length) {
+            cursor_position++;
+            terminal_move_cursor_right();
+        }
+        
+    } else if (c == KEY_ARROW_UP || c == KEY_ARROW_DOWN) {
+        /* Up/Down arrows - could be used for command history in the future */
+        /* For now, just ignore them */
+        
     } else if (c >= 32 && c <= 126) {
-        /* Handle printable characters */
+        /* Handle printable characters - insert at cursor position */
         if (command_length < SHELL_MAX_COMMAND_LENGTH - 1) {
-            command_buffer[command_length++] = c;
-            terminal_putchar(c);
-            terminal_update_cursor();
+            /* Shift characters right to make space */
+            for (size_t i = command_length; i > cursor_position; i--) {
+                command_buffer[i] = command_buffer[i - 1];
+            }
+            
+            /* Insert the new character */
+            command_buffer[cursor_position] = c;
+            command_length++;
+            cursor_position++;
+            
+            /* Redraw the line */
+            shell_redraw_line();
         }
     }
 }
