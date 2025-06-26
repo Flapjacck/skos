@@ -18,6 +18,7 @@
 #include "kernel.h"  /* For terminal output functions */
 #include "pic.h"     /* For PIC EOI handling */
 #include "memory.h"  /* For page fault handling */
+#include "debug.h"   /* For profiling and debugging */
 #include "../drivers/timer.h"  /* For timer interrupt handling */
 
 /*------------------------------------------------------------------------------
@@ -331,6 +332,9 @@ void interrupt_handler(interrupt_registers_t *regs)
      * it detects an error or exceptional condition during instruction execution.
      */
     if (regs->int_no < 32) {
+        /* Count this exception for profiling */
+        debug_count_exception(regs->int_no);
+        
         /* Handle page faults specially */
         if (regs->int_no == IDT_PAGE_FAULT) {
             page_fault_handler(regs->err_code);
@@ -423,6 +427,9 @@ void interrupt_handler(interrupt_registers_t *regs)
     else if (regs->int_no >= 32 && regs->int_no < 48) {
         /* This is a hardware IRQ */
         uint32_t irq_num = regs->int_no - 32;
+        
+        /* Count this interrupt for profiling */
+        debug_count_interrupt(irq_num);
         
         /* Check for spurious IRQs first */
         if ((irq_num == 7 || irq_num == 15) && pic_is_spurious_irq(irq_num)) {

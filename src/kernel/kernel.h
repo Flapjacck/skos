@@ -14,6 +14,9 @@
 /* Include PIC definitions */
 #include "pic.h"
 
+/* Include debug definitions */
+#include "debug.h"
+
 /* Include keyboard driver definitions */
 #include "../drivers/keyboard.h"
 

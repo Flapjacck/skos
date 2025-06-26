@@ -16,6 +16,7 @@
 #include "idt.h"
 #include "pic.h"
 #include "memory.h"
+#include "debug.h"
 #include "../drivers/timer.h"
 
 /* Global variables for terminal state */
@@ -214,6 +215,9 @@ void terminal_move_cursor_end(void) {
 void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     /* Initialize terminal interface first for debug output */
     terminal_initialize();
+    
+    /* Initialize debugging subsystem early */
+    debug_init();
 
     /* Check multiboot magic number */
     if (magic != 0x2BADB002) {

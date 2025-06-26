@@ -1,6 +1,6 @@
 # Compiler and linker settings
 CC = gcc
-CFLAGS = -m32 -ffreestanding -Wall -Wextra -fno-exceptions -fno-stack-protector
+CFLAGS = -m32 -ffreestanding -Wall -Wextra -fno-exceptions -fstack-protector -g
 LDFLAGS = -m elf_i386 -T src/kernel/linker.ld
 
 # Object files
@@ -12,6 +12,7 @@ KERNEL_OBJS = \
 	idt.o \
 	idt_asm.o \
 	pic.o \
+	debug.o \
 	keyboard.o \
 	shell.o \
 	memory.o \
@@ -47,6 +48,10 @@ idt_asm.o: src/kernel/idt.asm
 # Compile PIC C implementation
 pic.o: src/kernel/pic.c
 	$(CC) $(CFLAGS) -c src/kernel/pic.c -o pic.o
+
+# Compile debug C implementation
+debug.o: src/kernel/debug.c
+	$(CC) $(CFLAGS) -c src/kernel/debug.c -o debug.o
 
 # Compile keyboard driver
 keyboard.o: src/drivers/keyboard.c

@@ -10,6 +10,7 @@
 #include "../kernel/kernel.h"
 #include "../kernel/memory.h"
 #include "../kernel/pic.h"
+#include "../kernel/debug.h"
 #include "timer.h"
 #include "keyboard.h"
 
@@ -109,6 +110,7 @@ static const shell_command_t commands[] = {
     {"cpuid", shell_cmd_cpuid, "Show CPU information and features"},
     {"regs", shell_cmd_regs, "Show CPU register information"},
     {"irq", shell_cmd_irq, "Show interrupt controller status"},
+    {"debug", shell_cmd_debug, "Show kernel profiling and debug statistics"},
     {"echo", shell_cmd_echo, "Echo text back"},
     {"reboot", shell_cmd_reboot, "Reboot the system"},
     {"scancode", shell_cmd_scancode, "Enter scancode debug mode (press q to quit)"}
@@ -680,6 +682,11 @@ void shell_cmd_echo(void) {
     terminal_writestring("Echo: This is the echo command!\n");
     terminal_writestring("Note: Argument parsing not yet implemented.\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+}
+
+/* Debug command - shows kernel profiling and debug statistics */
+void shell_cmd_debug(void) {
+    debug_print_profiling_stats();
 }
 
 /* Reboot command - reboots the system */

@@ -12,6 +12,7 @@
 
 #include "memory.h"
 #include "kernel.h"
+#include "debug.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -228,6 +229,9 @@ uint32_t allocate_physical_page(void) {
                 phys_allocator.first_free_page++;
             }
             
+            /* Track allocation for profiling */
+            debug_count_memory_alloc(PAGE_SIZE);
+            
             return page * PAGE_SIZE;
         }
     }
@@ -257,6 +261,9 @@ void free_physical_page(uint32_t page_addr) {
         /* Page was allocated, now free it */
         phys_allocator.bitmap[bitmap_index] &= ~(1 << bit_index);
         phys_allocator.used_pages--;
+        
+        /* Track deallocation for profiling */
+        debug_count_memory_free(PAGE_SIZE);
         
         /* Update hint if this page is before current hint */
         if (page < phys_allocator.first_free_page) {

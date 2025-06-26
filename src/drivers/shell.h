@@ -23,6 +23,7 @@ void shell_cmd_sleep(void);
 void shell_cmd_cpuid(void);
 void shell_cmd_regs(void);
 void shell_cmd_irq(void);
+void shell_cmd_debug(void);
 void shell_cmd_echo(void);
 void shell_cmd_reboot(void);
 void shell_cmd_scancode(void);
