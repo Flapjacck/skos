@@ -11,8 +11,10 @@
 #include "../kernel/memory.h"
 #include "../kernel/pic.h"
 #include "../kernel/debug.h"
+#include "../kernel/fat32.h"
 #include "timer.h"
 #include "keyboard.h"
+#include "ata.h"
 
 /* Forward declarations for helper functions */
 static void print_hex32(uint32_t value);
@@ -113,7 +115,10 @@ static const shell_command_t commands[] = {
     {"debug", shell_cmd_debug, "Show kernel profiling and debug statistics"},
     {"echo", shell_cmd_echo, "Echo text back"},
     {"reboot", shell_cmd_reboot, "Reboot the system"},
-    {"scancode", shell_cmd_scancode, "Enter scancode debug mode (press q to quit)"}
+    {"scancode", shell_cmd_scancode, "Enter scancode debug mode (press q to quit)"},
+    {"ls", shell_cmd_ls, "List files in current directory"},
+    {"cat", shell_cmd_cat, "Display contents of a file"},
+    {"fsinfo", shell_cmd_fsinfo, "Show file system information"}
 };
 
 #define NUM_COMMANDS (sizeof(commands) / sizeof(commands[0]))
@@ -730,6 +735,363 @@ void shell_cmd_scancode(void) {
     
     /* Debug mode exited, print prompt */
     shell_print_prompt();
+}
+
+/* List files command - shows files in current directory */
+void shell_cmd_ls(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== DIRECTORY LISTING ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Check if FAT32 is initialized */
+    fat32_fs_info_t* fs_info = fat32_get_fs_info();
+    if (!fs_info) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("File system not initialized!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    /* Open root directory */
+    fat32_dir_t* dir = fat32_opendir("/");
+    if (!dir) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("Failed to open root directory!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    /* Read and display directory entries */
+    fat32_dir_entry_t* entry;
+    int file_count = 0;
+    
+    while ((entry = fat32_readdir(dir)) != NULL) {
+        /* Set color based on file type */
+        if (entry->attributes & FAT_ATTR_DIRECTORY) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+        } else {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+        }
+        
+        fat32_print_file_info(entry);
+        file_count++;
+    }
+    
+    fat32_closedir(dir);
+    
+    /* Print summary */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("\nTotal entries: ");
+    
+    /* Print file count */
+    char count_str[16];
+    int digits = 0;
+    int temp = file_count;
+    
+    if (temp == 0) {
+        count_str[0] = '0';
+        digits = 1;
+    } else {
+        while (temp > 0) {
+            count_str[digits++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    
+    /* Reverse the string */
+    for (int i = 0; i < digits / 2; i++) {
+        char temp_c = count_str[i];
+        count_str[i] = count_str[digits - 1 - i];
+        count_str[digits - 1 - i] = temp_c;
+    }
+    count_str[digits] = '\0';
+    
+    terminal_writestring(count_str);
+    terminal_writestring("\n\n");
+}
+
+/* Cat command - display file contents */
+void shell_cmd_cat(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== FILE CONTENTS ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Check if FAT32 is initialized */
+    fat32_fs_info_t* fs_info = fat32_get_fs_info();
+    if (!fs_info) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("File system not initialized!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    /* For demo purposes, try to read a test file */
+    /* In a full implementation, this would parse command arguments */
+    const char* filename = "README.TXT";
+    
+    terminal_writestring("Attempting to read file: ");
+    terminal_writestring(filename);
+    terminal_writestring("\n\n");
+    
+    /* Open the file */
+    fat32_file_t* file = fat32_open(filename);
+    if (!file) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("File not found: ");
+        terminal_writestring(filename);
+        terminal_writestring("\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        terminal_writestring("Note: This command currently looks for README.TXT\n");
+        terminal_writestring("Full argument parsing will be added in future updates.\n\n");
+        return;
+    }
+    
+    /* Read and display file contents */
+    char buffer[513];  /* 512 bytes + null terminator */
+    size_t bytes_read;
+    size_t total_bytes = 0;
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    
+    while ((bytes_read = fat32_read(file, buffer, 512)) > 0) {
+        buffer[bytes_read] = '\0';  /* Null terminate for display */
+        
+        /* Display the content, handling special characters */
+        for (size_t i = 0; i < bytes_read; i++) {
+            char c = buffer[i];
+            if (c == '\n') {
+                terminal_putchar('\n');
+            } else if (c == '\t') {
+                terminal_writestring("    ");  /* Replace tabs with spaces */
+            } else if (c >= 32 && c <= 126) {
+                terminal_putchar(c);  /* Printable ASCII */
+            } else {
+                terminal_putchar('?');  /* Replace non-printable with ? */
+            }
+        }
+        
+        total_bytes += bytes_read;
+        
+        /* Break if we've read enough to avoid screen overflow */
+        if (total_bytes > 2048) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
+            terminal_writestring("\n\n[... truncated after 2KB ...]");
+            break;
+        }
+    }
+    
+    fat32_close(file);
+    
+    /* Print file statistics */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("\n\nBytes displayed: ");
+    
+    /* Print total bytes */
+    char bytes_str[16];
+    int digits = 0;
+    int temp = total_bytes;
+    
+    if (temp == 0) {
+        bytes_str[0] = '0';
+        digits = 1;
+    } else {
+        while (temp > 0) {
+            bytes_str[digits++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    
+    /* Reverse the string */
+    for (int i = 0; i < digits / 2; i++) {
+        char temp_c = bytes_str[i];
+        bytes_str[i] = bytes_str[digits - 1 - i];
+        bytes_str[digits - 1 - i] = temp_c;
+    }
+    bytes_str[digits] = '\0';
+    
+    terminal_writestring(bytes_str);
+    terminal_writestring("\n\n");
+}
+
+/* File system info command - shows FAT32 information */
+void shell_cmd_fsinfo(void) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== FILE SYSTEM INFORMATION ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Check if FAT32 is initialized */
+    fat32_fs_info_t* fs_info = fat32_get_fs_info();
+    if (!fs_info) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("File system not initialized!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    /* Display file system information */
+    terminal_writestring("File System Type: FAT32\n");
+    
+    terminal_writestring("Bytes per Sector: ");
+    char value_str[16];
+    int digits = 0;
+    uint32_t temp = fs_info->boot_sector.bytes_per_sector;
+    
+    if (temp == 0) {
+        value_str[0] = '0';
+        digits = 1;
+    } else {
+        while (temp > 0) {
+            value_str[digits++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    
+    /* Reverse the string */
+    for (int i = 0; i < digits / 2; i++) {
+        char temp_c = value_str[i];
+        value_str[i] = value_str[digits - 1 - i];
+        value_str[digits - 1 - i] = temp_c;
+    }
+    value_str[digits] = '\0';
+    
+    terminal_writestring(value_str);
+    terminal_writestring("\n");
+    
+    terminal_writestring("Sectors per Cluster: ");
+    digits = 0;
+    temp = fs_info->sectors_per_cluster;
+    
+    if (temp == 0) {
+        value_str[0] = '0';
+        digits = 1;
+    } else {
+        while (temp > 0) {
+            value_str[digits++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    
+    /* Reverse the string */
+    for (int i = 0; i < digits / 2; i++) {
+        char temp_c = value_str[i];
+        value_str[i] = value_str[digits - 1 - i];
+        value_str[digits - 1 - i] = temp_c;
+    }
+    value_str[digits] = '\0';
+    
+    terminal_writestring(value_str);
+    terminal_writestring("\n");
+    
+    terminal_writestring("Bytes per Cluster: ");
+    digits = 0;
+    temp = fs_info->bytes_per_cluster;
+    
+    if (temp == 0) {
+        value_str[0] = '0';
+        digits = 1;
+    } else {
+        while (temp > 0) {
+            value_str[digits++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    
+    /* Reverse the string */
+    for (int i = 0; i < digits / 2; i++) {
+        char temp_c = value_str[i];
+        value_str[i] = value_str[digits - 1 - i];
+        value_str[digits - 1 - i] = temp_c;
+    }
+    value_str[digits] = '\0';
+    
+    terminal_writestring(value_str);
+    terminal_writestring("\n");
+    
+    terminal_writestring("Total Clusters: ");
+    digits = 0;
+    temp = fs_info->total_clusters;
+    
+    if (temp == 0) {
+        value_str[0] = '0';
+        digits = 1;
+    } else {
+        while (temp > 0) {
+            value_str[digits++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    
+    /* Reverse the string */
+    for (int i = 0; i < digits / 2; i++) {
+        char temp_c = value_str[i];
+        value_str[i] = value_str[digits - 1 - i];
+        value_str[digits - 1 - i] = temp_c;
+    }
+    value_str[digits] = '\0';
+    
+    terminal_writestring(value_str);
+    terminal_writestring("\n");
+    
+    terminal_writestring("Root Directory Cluster: ");
+    digits = 0;
+    temp = fs_info->root_dir_cluster;
+    
+    if (temp == 0) {
+        value_str[0] = '0';
+        digits = 1;
+    } else {
+        while (temp > 0) {
+            value_str[digits++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    
+    /* Reverse the string */
+    for (int i = 0; i < digits / 2; i++) {
+        char temp_c = value_str[i];
+        value_str[i] = value_str[digits - 1 - i];
+        value_str[digits - 1 - i] = temp_c;
+    }
+    value_str[digits] = '\0';
+    
+    terminal_writestring(value_str);
+    terminal_writestring("\n");
+    
+    /* Display volume label if available */
+    terminal_writestring("Volume Label: ");
+    char label[12];
+    for (int i = 0; i < 11; i++) {
+        label[i] = fs_info->boot_sector.volume_label[i];
+        if (label[i] == 0) break;
+    }
+    label[11] = '\0';
+    
+    /* Trim trailing spaces */
+    for (int i = 10; i >= 0 && label[i] == ' '; i--) {
+        label[i] = '\0';
+    }
+    
+    if (label[0] != '\0') {
+        terminal_writestring(label);
+    } else {
+        terminal_writestring("(none)");
+    }
+    terminal_writestring("\n");
+    
+    /* Show storage device information */
+    terminal_writestring("\nStorage Device Information:\n");
+    ata_device_t* device = ata_get_primary_master();
+    if (!device) {
+        device = ata_get_primary_slave();
+    }
+    
+    if (device) {
+        ata_print_device_info(device);
+    } else {
+        terminal_writestring("  No storage device detected\n");
+    }
+    
+    terminal_writestring("\n");
 }
 
 /* Helper functions for hex printing */

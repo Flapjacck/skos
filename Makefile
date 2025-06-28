@@ -16,7 +16,9 @@ KERNEL_OBJS = \
 	keyboard.o \
 	shell.o \
 	memory.o \
-	timer.o
+	timer.o \
+	ata.o \
+	fat32.o
 
 # Default target
 all: myos.iso
@@ -68,6 +70,14 @@ timer.o: src/drivers/timer.c
 # Compile memory manager
 memory.o: src/kernel/memory.c
 	$(CC) $(CFLAGS) -c src/kernel/memory.c -o memory.o
+
+# Compile ATA driver
+ata.o: src/drivers/ata.c
+	$(CC) $(CFLAGS) -c src/drivers/ata.c -o ata.o
+
+# Compile FAT32 file system
+fat32.o: src/kernel/fat32.c
+	$(CC) $(CFLAGS) -c src/kernel/fat32.c -o fat32.o
 
 # Link the kernel
 myos.bin: $(KERNEL_OBJS)

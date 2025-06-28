@@ -17,7 +17,9 @@
 #include "pic.h"
 #include "memory.h"
 #include "debug.h"
+#include "fat32.h"
 #include "../drivers/timer.h"
+#include "../drivers/ata.h"
 
 /* Global variables for terminal state */
 size_t terminal_row;
@@ -289,6 +291,30 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     shell_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
+    
+    /* Initialize ATA Driver */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing ATA/IDE... ");
+    bool ata_success = ata_init();
+    if (ata_success) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+        terminal_writestring("OK\n");
+    } else {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
+        terminal_writestring("NO DRIVES\n");
+    }
+    
+    /* Initialize FAT32 File System */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("Initializing FAT32... ");
+    bool fat32_success = fat32_init();
+    if (fat32_success) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+        terminal_writestring("OK\n");
+    } else {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
+        terminal_writestring("NO FS\n");
+    }
     
     /* Enable interrupts */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));

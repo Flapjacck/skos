@@ -27,6 +27,9 @@ void shell_cmd_debug(void);
 void shell_cmd_echo(void);
 void shell_cmd_reboot(void);
 void shell_cmd_scancode(void);
+void shell_cmd_ls(void);
+void shell_cmd_cat(void);
+void shell_cmd_fsinfo(void);
 
 /* Utility functions */
 void shell_print_prompt(void);
