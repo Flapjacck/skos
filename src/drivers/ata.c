@@ -74,7 +74,7 @@ static void ata_select_drive(ata_device_t* device) {
 /* Wait for drive to be ready */
 bool ata_wait_ready(ata_device_t* device) {
     uint8_t status;
-    int timeout = 10000;
+    int timeout = 50000;  /* Increased timeout for QEMU */
     
     while (timeout--) {
         status = inb(device->io_base + ATA_REG_STATUS);
@@ -90,7 +90,7 @@ bool ata_wait_ready(ata_device_t* device) {
         }
         
         /* Small delay */
-        for (volatile int i = 0; i < 100; i++);
+        ata_delay(device);
     }
     
     return false;
@@ -99,7 +99,7 @@ bool ata_wait_ready(ata_device_t* device) {
 /* Wait for data request */
 bool ata_wait_drq(ata_device_t* device) {
     uint8_t status;
-    int timeout = 10000;
+    int timeout = 50000;  /* Increased timeout for QEMU */
     
     while (timeout--) {
         status = inb(device->io_base + ATA_REG_STATUS);
@@ -115,7 +115,7 @@ bool ata_wait_drq(ata_device_t* device) {
         }
         
         /* Small delay */
-        for (volatile int i = 0; i < 100; i++);
+        ata_delay(device);
     }
     
     return false;
@@ -141,16 +141,52 @@ bool ata_identify(ata_device_t* device) {
     /* Select the drive */
     ata_select_drive(device);
     
+    /* Reset error information */
+    outb(device->io_base + ATA_REG_FEATURES, 0);
+    
+    /* Clear sector count, LBA registers */
+    outb(device->io_base + ATA_REG_SECTOR_COUNT, 0);
+    outb(device->io_base + ATA_REG_LBA_LOW, 0);
+    outb(device->io_base + ATA_REG_LBA_MID, 0);
+    outb(device->io_base + ATA_REG_LBA_HIGH, 0);
+    
     /* Send IDENTIFY command */
     outb(device->io_base + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
     
-    /* Check if drive exists */
+    /* Check if drive exists - read status immediately after command */
     uint8_t status = inb(device->io_base + ATA_REG_STATUS);
     if (status == 0) {
         return false;  /* Drive does not exist */
     }
     
-    /* Wait for the drive to respond */
+    /* Wait for BSY to clear */
+    int timeout = 50000;
+    while (timeout-- > 0) {
+        status = inb(device->io_base + ATA_REG_STATUS);
+        if (!(status & ATA_STATUS_BSY)) {
+            break;
+        }
+        ata_delay(device);
+    }
+    
+    if (timeout <= 0) {
+        return false;
+    }
+    
+    /* Check for non-ATA device (ATAPI) */
+    uint8_t lba_mid = inb(device->io_base + ATA_REG_LBA_MID);
+    uint8_t lba_high = inb(device->io_base + ATA_REG_LBA_HIGH);
+    
+    if (lba_mid != 0 || lba_high != 0) {
+        return false;  /* ATAPI device, not ATA */
+    }
+    
+    /* Check for errors */
+    if (status & ATA_STATUS_ERR) {
+        return false;
+    }
+    
+    /* Wait for data to be ready */
     if (!ata_wait_drq(device)) {
         return false;
     }
@@ -175,6 +211,12 @@ bool ata_identify(ata_device_t* device) {
     
     /* Get number of sectors (LBA28) */
     device->sectors = (uint32_t)identify_data[60] | ((uint32_t)identify_data[61] << 16);
+    
+    /* If sectors is 0, try to get from other words */
+    if (device->sectors == 0) {
+        /* Some drives store total sectors in different words */
+        device->sectors = (uint32_t)identify_data[57] | ((uint32_t)identify_data[58] << 16);
+    }
     
     device->present = true;
     return true;
@@ -289,44 +331,42 @@ bool ata_init(void) {
     current_primary_drive = 0xFF;
     current_secondary_drive = 0xFF;
     
+    /* Reset IDE controllers */
+    outb(ATA_PRIMARY_CTRL_BASE + ATA_REG_ALT_STATUS, 0x04);   /* Software reset */
+    outb(ATA_SECONDARY_CTRL_BASE + ATA_REG_ALT_STATUS, 0x04); /* Software reset */
+    
+    /* Wait for reset to complete */
+    for (volatile int i = 0; i < 10000; i++);
+    
+    outb(ATA_PRIMARY_CTRL_BASE + ATA_REG_ALT_STATUS, 0x00);   /* Clear reset */
+    outb(ATA_SECONDARY_CTRL_BASE + ATA_REG_ALT_STATUS, 0x00); /* Clear reset */
+    
+    /* Wait after reset */
+    for (volatile int i = 0; i < 10000; i++);
+    
     /* Identify drives */
     bool found_drives = false;
     
-    debug_print("ATA: Detecting primary master...");
     if (ata_identify(&primary_master)) {
-        debug_print("ATA: Primary master detected");
         ata_print_device_info(&primary_master);
         found_drives = true;
     }
     
-    debug_print("ATA: Detecting primary slave...");
     if (ata_identify(&primary_slave)) {
-        debug_print("ATA: Primary slave detected");
         ata_print_device_info(&primary_slave);
         found_drives = true;
     }
     
-    debug_print("ATA: Detecting secondary master...");
     if (ata_identify(&secondary_master)) {
-        debug_print("ATA: Secondary master detected");
         ata_print_device_info(&secondary_master);
         found_drives = true;
     }
     
-    debug_print("ATA: Detecting secondary slave...");
     if (ata_identify(&secondary_slave)) {
-        debug_print("ATA: Secondary slave detected");
         ata_print_device_info(&secondary_slave);
         found_drives = true;
     }
-    
-    if (found_drives) {
-        debug_print("ATA: Initialization complete");
-    } else {
-        debug_print("ATA: No drives detected");
-    }
-    
-    return found_drives;
+     return found_drives;
 }
 
 /* Get primary master device */

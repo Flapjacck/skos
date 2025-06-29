@@ -90,9 +90,31 @@ myos.iso: myos.bin
 	cp src/boot/grub.cfg isodir/boot/grub/grub.cfg
 	grub-mkrescue -o myos.iso isodir
 
-# Run the OS in QEMU
-run: myos.iso
-	qemu-system-i386 -cdrom myos.iso
+# Create disk image if it doesn't exist
+disk.img:
+	@if [ ! -f disk.img ]; then \
+		echo "Creating 64MB disk image..."; \
+		dd if=/dev/zero of=disk.img bs=1M count=64; \
+		echo "Formatting with FAT32..."; \
+		mkfs.fat -F 32 disk.img; \
+		echo "Mounting disk image..."; \
+		mkdir -p mnt; \
+		sudo mount -o loop disk.img mnt; \
+		echo "Adding test files..."; \
+		echo "This is a test file for SKOS FAT32 implementation." | sudo tee mnt/README.TXT > /dev/null; \
+		echo "Hello from SKOS file system!" | sudo tee mnt/TEST.TXT > /dev/null; \
+		echo "Another test file with more content for testing." | sudo tee mnt/HELLO.TXT > /dev/null; \
+		sudo umount mnt; \
+		echo "Disk image created successfully!"; \
+	fi
+
+# Run the OS in QEMU with disk attached
+run: myos.iso disk.img
+	qemu-system-i386 -cdrom myos.iso -hda disk.img -boot d
+
+# Run with debugging enabled
+debug: myos.iso disk.img
+	qemu-system-i386 -cdrom myos.iso -hda disk.img -boot d -s -S
 
 # Clean up
 clean:

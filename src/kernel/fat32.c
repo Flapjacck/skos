@@ -42,7 +42,6 @@ static fat32_dir_t dir_handles[MAX_OPEN_DIRS];
 /* Read a sector from the storage device */
 bool fat32_read_sector(uint32_t sector, void* buffer) {
     if (!storage_device) {
-        debug_print("FAT32: No storage device available");
         return false;
     }
     
@@ -52,7 +51,6 @@ bool fat32_read_sector(uint32_t sector, void* buffer) {
 /* Write a sector to the storage device */
 bool fat32_write_sector(uint32_t sector, const void* buffer) {
     if (!storage_device) {
-        debug_print("FAT32: No storage device available");
         return false;
     }
     
@@ -66,8 +64,6 @@ bool fat32_write_sector(uint32_t sector, const void* buffer) {
 
 /* Initialize FAT32 file system */
 bool fat32_init(void) {
-    debug_print("FAT32: Initializing file system...");
-    
     /* Clear file system info */
     for (size_t i = 0; i < sizeof(fat32_fs_info_t); i++) {
         ((uint8_t*)&fs_info)[i] = 0;
@@ -90,21 +86,16 @@ bool fat32_init(void) {
     }
     
     if (!storage_device) {
-        debug_print("FAT32: No storage device found");
         return false;
     }
     
-    debug_print("FAT32: Using storage device");
-    
     /* Try to read the boot sector */
     if (!fat32_read_sector(0, &fs_info.boot_sector)) {
-        debug_print("FAT32: Failed to read boot sector");
         return false;
     }
     
     /* Verify this is a valid FAT32 boot sector */
     if (fs_info.boot_sector.boot_sector_signature != 0xAA55) {
-        debug_print("FAT32: Invalid boot sector signature");
         return false;
     }
     
@@ -112,7 +103,6 @@ bool fat32_init(void) {
     if (fs_info.boot_sector.fat_size_16 != 0 || 
         fs_info.boot_sector.root_entries != 0 ||
         fs_info.boot_sector.total_sectors_16 != 0) {
-        debug_print("FAT32: Not a FAT32 file system");
         return false;
     }
     
@@ -130,8 +120,6 @@ bool fat32_init(void) {
     
     /* Mark as initialized */
     fs_info.initialized = true;
-    
-    debug_print("FAT32: File system initialized successfully");
     
     return true;
 }
@@ -281,14 +269,12 @@ fat32_file_t* fat32_open(const char* filename) {
     }
     
     if (!file) {
-        debug_print("FAT32: No free file handles");
         return NULL;
     }
     
     /* Find the file in the root directory */
     fat32_dir_entry_t* entry = fat32_find_entry(fs_info.root_dir_cluster, filename);
     if (!entry) {
-        debug_print("FAT32: File not found");
         return NULL;
     }
     
@@ -308,8 +294,6 @@ fat32_file_t* fat32_open(const char* filename) {
     }
     file->filename[len] = '\0';
     
-    debug_print("FAT32: Opened file successfully");
-    
     return file;
 }
 
@@ -317,7 +301,6 @@ fat32_file_t* fat32_open(const char* filename) {
 void fat32_close(fat32_file_t* file) {
     if (file && file->is_open) {
         file->is_open = false;
-        debug_print("FAT32: Closed file");
     }
 }
 
@@ -387,7 +370,6 @@ size_t fat32_write(fat32_file_t* file, const void* buffer, size_t size) {
     (void)file;    /* Suppress unused parameter warning */
     (void)buffer;  /* Suppress unused parameter warning */
     (void)size;    /* Suppress unused parameter warning */
-    debug_print("FAT32: Write operation not yet implemented");
     return 0;
 }
 
@@ -446,7 +428,6 @@ fat32_dir_t* fat32_opendir(const char* path) {
     }
     
     if (!dir) {
-        debug_print("FAT32: No free directory handles");
         return NULL;
     }
     
@@ -458,7 +439,6 @@ fat32_dir_t* fat32_opendir(const char* path) {
         return dir;
     }
     
-    debug_print("FAT32: Directory path not supported");
     return NULL;
 }
 

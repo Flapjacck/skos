@@ -477,33 +477,7 @@ void interrupt_handler(interrupt_registers_t *regs)
             /* IRQ0: Timer interrupt - handle timer ticks */
             timer_interrupt_handler();
         } else {
-            /* Generic IRQ handling for debugging - show other IRQs */
-            terminal_setcolor(vga_entry_color(VGA_COLOR_BROWN, VGA_COLOR_BLACK));
-            terminal_writestring("Received IRQ: ");
-            
-            /* Convert IRQ number to string */
-            char num_str[16];
-            int i = 0;
-            if (irq_num == 0) {
-                num_str[i++] = '0';
-            } else {
-                uint32_t temp_irq = irq_num;
-                while (temp_irq > 0) {
-                    num_str[i++] = '0' + (temp_irq % 10);
-                    temp_irq /= 10;
-                }
-                /* Reverse the string */
-                for (int j = 0; j < i / 2; j++) {
-                    char temp = num_str[j];
-                    num_str[j] = num_str[i - 1 - j];
-                    num_str[i - 1 - j] = temp;
-                }
-            }
-            num_str[i] = '\0';
-            terminal_writestring(num_str);
-            terminal_writestring("\n");
-            
-            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+            /* Silently handle other IRQs */
         }
         
         /* Send End of Interrupt (EOI) to PIC for real IRQs */
