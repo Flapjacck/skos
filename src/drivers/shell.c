@@ -97,7 +97,7 @@ static size_t cursor_position = 0;  /* Cursor position within command buffer */
 /* Command table structure */
 typedef struct {
     const char* name;
-    void (*function)(void);
+    void (*function)(const char* args);
     const char* description;
 } shell_command_t;
 
@@ -156,6 +156,33 @@ size_t shell_strlen(const char* str) {
     return len;
 }
 
+/* Parse command line into command and arguments */
+static const char* shell_parse_command(const char* cmdline, char* cmd_name, size_t cmd_name_size) {
+    if (!cmdline || !cmd_name || cmd_name_size == 0) {
+        return NULL;
+    }
+    
+    /* Skip leading whitespace */
+    while (*cmdline == ' ' || *cmdline == '\t') {
+        cmdline++;
+    }
+    
+    /* Extract command name */
+    size_t i = 0;
+    while (*cmdline && *cmdline != ' ' && *cmdline != '\t' && i < cmd_name_size - 1) {
+        cmd_name[i++] = *cmdline++;
+    }
+    cmd_name[i] = '\0';
+    
+    /* Skip whitespace after command */
+    while (*cmdline == ' ' || *cmdline == '\t') {
+        cmdline++;
+    }
+    
+    /* Return pointer to arguments (or NULL if no args) */
+    return (*cmdline) ? cmdline : NULL;
+}
+
 /* Print shell prompt */
 void shell_print_prompt(void) {
     terminal_writestring("skos~$ ");
@@ -192,7 +219,8 @@ static void shell_redraw_line(void) {
  */
 
 /* Help command - shows all available commands */
-void shell_cmd_help(void) {
+void shell_cmd_help(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
     terminal_writestring("\n=== SKOS SHELL COMMANDS ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -210,13 +238,15 @@ void shell_cmd_help(void) {
 }
 
 /* Clear command - clears the screen */
-void shell_cmd_clear(void) {
+void shell_cmd_clear(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_initialize();  /* Re-initialize terminal to clear screen */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
 }
 
 /* Memory command - shows memory information */
-void shell_cmd_mem(void) {
+void shell_cmd_mem(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
     terminal_writestring("\n=== MEMORY INFORMATION ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -227,7 +257,8 @@ void shell_cmd_mem(void) {
 }
 
 /* Uptime command - shows system uptime */
-void shell_cmd_uptime(void) {
+void shell_cmd_uptime(const char* args) {
+    (void)args; /* Unused parameter */
     if (!timer_is_initialized()) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
         terminal_writestring("Timer not initialized!\n");
@@ -361,7 +392,8 @@ void shell_cmd_uptime(void) {
 }
 
 /* Timer command - shows timer information */
-void shell_cmd_timer(void) {
+void shell_cmd_timer(const char* args) {
+    (void)args; /* Unused parameter */
     if (!timer_is_initialized()) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
         terminal_writestring("Timer not initialized!\n");
@@ -448,7 +480,8 @@ void shell_cmd_timer(void) {
 }
 
 /* Sleep command - demonstrates timer sleep functionality */
-void shell_cmd_sleep(void) {
+void shell_cmd_sleep(const char* args) {
+    (void)args; /* Unused parameter */
     if (!timer_is_initialized()) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
         terminal_writestring("Timer not initialized!\n");
@@ -469,7 +502,8 @@ void shell_cmd_sleep(void) {
 }
 
 /* CPUID command - shows CPU information and features */
-void shell_cmd_cpuid(void) {
+void shell_cmd_cpuid(const char* args) {
+    (void)args; /* Unused parameter */
     uint32_t eax, ebx, ecx, edx;
     
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
@@ -551,7 +585,8 @@ void shell_cmd_cpuid(void) {
 }
 
 /* Register command - shows CPU register information */
-void shell_cmd_regs(void) {
+void shell_cmd_regs(const char* args) {
+    (void)args; /* Unused parameter */
     uint32_t eax, ebx, ecx, edx, esp, ebp, esi, edi;
     uint32_t cr0, cr2, cr3;
     uint16_t cs, ds, es, fs, gs, ss;
@@ -617,7 +652,8 @@ void shell_cmd_regs(void) {
 }
 
 /* IRQ command - shows interrupt controller status */
-void shell_cmd_irq(void) {
+void shell_cmd_irq(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
     terminal_writestring("\n=== INTERRUPT CONTROLLER STATUS ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -682,7 +718,8 @@ void shell_cmd_irq(void) {
 }
 
 /* Echo command - echoes text back */
-void shell_cmd_echo(void) {
+void shell_cmd_echo(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("Echo: This is the echo command!\n");
     terminal_writestring("Note: Argument parsing not yet implemented.\n");
@@ -690,12 +727,14 @@ void shell_cmd_echo(void) {
 }
 
 /* Debug command - shows kernel profiling and debug statistics */
-void shell_cmd_debug(void) {
+void shell_cmd_debug(const char* args) {
+    (void)args; /* Unused parameter */
     debug_print_profiling_stats();
 }
 
 /* Reboot command - reboots the system */
-void shell_cmd_reboot(void) {
+void shell_cmd_reboot(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
     terminal_writestring("Rebooting system...\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -714,7 +753,8 @@ void shell_cmd_reboot(void) {
 }
 
 /* Scancode command - enters scancode debug mode */
-void shell_cmd_scancode(void) {
+void shell_cmd_scancode(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
     terminal_writestring("\n=== SCANCODE DEBUG MODE ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -738,7 +778,8 @@ void shell_cmd_scancode(void) {
 }
 
 /* List files command - shows files in current directory */
-void shell_cmd_ls(void) {
+void shell_cmd_ls(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
     terminal_writestring("\n=== DIRECTORY LISTING ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -811,7 +852,7 @@ void shell_cmd_ls(void) {
 }
 
 /* Cat command - display file contents */
-void shell_cmd_cat(void) {
+void shell_cmd_cat(const char* args) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
     terminal_writestring("\n=== FILE CONTENTS ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -825,9 +866,15 @@ void shell_cmd_cat(void) {
         return;
     }
     
-    /* For demo purposes, try to read a test file */
-    /* In a full implementation, this would parse command arguments */
-    const char* filename = "README.TXT";
+    /* Check if filename argument was provided */
+    const char* filename = args;
+    if (!filename || shell_strlen(filename) == 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("Usage: cat <filename>\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        terminal_writestring("Example: cat README.TXT\n\n");
+        return;
+    }
     
     terminal_writestring("Attempting to read file: ");
     terminal_writestring(filename);
@@ -841,8 +888,7 @@ void shell_cmd_cat(void) {
         terminal_writestring(filename);
         terminal_writestring("\n");
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-        terminal_writestring("Note: This command currently looks for README.TXT\n");
-        terminal_writestring("Full argument parsing will be added in future updates.\n\n");
+        terminal_writestring("Use 'ls' to see available files.\n\n");
         return;
     }
     
@@ -914,7 +960,8 @@ void shell_cmd_cat(void) {
 }
 
 /* File system info command - shows FAT32 information */
-void shell_cmd_fsinfo(void) {
+void shell_cmd_fsinfo(const char* args) {
+    (void)args; /* Unused parameter */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
     terminal_writestring("\n=== FILE SYSTEM INFORMATION ===\n\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -1137,11 +1184,15 @@ void shell_process_command(const char* command) {
         return;
     }
     
+    /* Parse command line into command name and arguments */
+    char cmd_name[32];
+    const char* args = shell_parse_command(command, cmd_name, sizeof(cmd_name));
+    
     /* Look for matching command */
     bool command_found = false;
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
-        if (shell_strcmp(command, commands[i].name)) {
-            commands[i].function();
+        if (shell_strcmp(cmd_name, commands[i].name)) {
+            commands[i].function(args);
             command_found = true;
             break;
         }
@@ -1151,7 +1202,7 @@ void shell_process_command(const char* command) {
     if (!command_found) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
         terminal_writestring("Unknown command: '");
-        terminal_writestring(command);
+        terminal_writestring(cmd_name);
         terminal_writestring("'\n");
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
         terminal_writestring("Type 'help' for available commands\n");

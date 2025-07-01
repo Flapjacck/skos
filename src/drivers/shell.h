@@ -14,22 +14,22 @@ void shell_process_command(const char* command);
 void shell_handle_input(int c);  /* Changed from char to int to handle special keys */
 
 /* Built-in command functions */
-void shell_cmd_help(void);
-void shell_cmd_clear(void);
-void shell_cmd_mem(void);
-void shell_cmd_uptime(void);
-void shell_cmd_timer(void);
-void shell_cmd_sleep(void);
-void shell_cmd_cpuid(void);
-void shell_cmd_regs(void);
-void shell_cmd_irq(void);
-void shell_cmd_debug(void);
-void shell_cmd_echo(void);
-void shell_cmd_reboot(void);
-void shell_cmd_scancode(void);
-void shell_cmd_ls(void);
-void shell_cmd_cat(void);
-void shell_cmd_fsinfo(void);
+void shell_cmd_help(const char* args);
+void shell_cmd_clear(const char* args);
+void shell_cmd_mem(const char* args);
+void shell_cmd_uptime(const char* args);
+void shell_cmd_timer(const char* args);
+void shell_cmd_sleep(const char* args);
+void shell_cmd_cpuid(const char* args);
+void shell_cmd_regs(const char* args);
+void shell_cmd_irq(const char* args);
+void shell_cmd_debug(const char* args);
+void shell_cmd_echo(const char* args);
+void shell_cmd_reboot(const char* args);
+void shell_cmd_scancode(const char* args);
+void shell_cmd_ls(const char* args);
+void shell_cmd_cat(const char* args);
+void shell_cmd_fsinfo(const char* args);
 
 /* Utility functions */
 void shell_print_prompt(void);
