@@ -68,6 +68,12 @@ enum vga_color {
 #define VGA_HEIGHT 25  /* Standard VGA text mode height in characters */
 
 /*------------------------------------------------------------------------------
+ * Terminal Scrollback Buffer Constants
+ *------------------------------------------------------------------------------
+ */
+#define SCROLLBACK_LINES 100  /* Number of lines to store in scrollback buffer */
+
+/*------------------------------------------------------------------------------
  * Terminal Color Management Functions
  *------------------------------------------------------------------------------
  */
@@ -217,5 +223,25 @@ void terminal_move_cursor_home(void);
  * @brief Move cursor to end of input line
  */
 void terminal_move_cursor_end(void);
+
+/**
+ * @brief Scroll the terminal view up by one line
+ */
+void terminal_scroll_up(void);
+
+/**
+ * @brief Scroll the terminal view down by one line
+ */
+void terminal_scroll_down(void);
+
+/**
+ * @brief Check if the terminal is currently scrolled up (viewing history)
+ */
+bool terminal_is_scrolled(void);
+
+/**
+ * @brief Reset scroll position to show the current terminal content
+ */
+void terminal_reset_scroll(void);
 
 #endif /* KERNEL_H */

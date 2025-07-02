@@ -1252,8 +1252,12 @@ void shell_handle_input(int c) {
         }
         
     } else if (c == KEY_ARROW_UP || c == KEY_ARROW_DOWN) {
-        /* Up/Down arrows - could be used for command history in the future */
-        /* For now, just ignore them */
+        /* Up/Down arrows - handle terminal scrolling */
+        if (c == KEY_ARROW_UP) {
+            terminal_scroll_up();
+        } else if (c == KEY_ARROW_DOWN) {
+            terminal_scroll_down();
+        }
         
     } else if (c >= 32 && c <= 126) {
         /* Handle printable characters - insert at cursor position */

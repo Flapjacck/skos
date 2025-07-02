@@ -28,6 +28,13 @@ uint8_t terminal_color;
 uint16_t* terminal_buffer;
 size_t prompt_start_column;  /* Track where the prompt starts to prevent deletion */
 
+/* Scrollback buffer variables */
+static uint16_t scrollback_buffer[SCROLLBACK_LINES * VGA_WIDTH];  /* Scrollback buffer */
+static size_t scrollback_head = 0;       /* Current write position in circular buffer */
+static size_t scrollback_lines_used = 0; /* Number of lines actually stored */
+static int scroll_offset = 0;            /* Current scroll position (0 = bottom/current) */
+static uint16_t saved_terminal_buffer[VGA_HEIGHT * VGA_WIDTH]; /* Save current content when scrolling */
+
 /* Implementation of kernel functions */
 
 uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) {
@@ -67,6 +74,23 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y) {
 
 /* Scroll the terminal up by one line */
 void terminal_scroll(void) {
+    /* If we're scrolled up, automatically scroll back to bottom on new content */
+    if (scroll_offset > 0) {
+        terminal_reset_scroll();
+    }
+    
+    /* Save the top line to scrollback buffer before scrolling */
+    size_t scrollback_line_index = scrollback_head * VGA_WIDTH;
+    for (size_t x = 0; x < VGA_WIDTH; x++) {
+        scrollback_buffer[scrollback_line_index + x] = terminal_buffer[x];
+    }
+    
+    /* Update scrollback buffer head pointer (circular buffer) */
+    scrollback_head = (scrollback_head + 1) % SCROLLBACK_LINES;
+    if (scrollback_lines_used < SCROLLBACK_LINES) {
+        scrollback_lines_used++;
+    }
+    
     /* Move all lines up by one */
     for (size_t y = 0; y < VGA_HEIGHT - 1; y++) {
         for (size_t x = 0; x < VGA_WIDTH; x++) {
@@ -85,6 +109,11 @@ void terminal_scroll(void) {
 
 /* Handle newline in terminal */
 void terminal_newline(void) {
+    /* If we're scrolled up, automatically scroll back to bottom on new content */
+    if (scroll_offset > 0) {
+        terminal_reset_scroll();
+    }
+    
     terminal_column = 0;
     if (++terminal_row == VGA_HEIGHT) {
         terminal_row = VGA_HEIGHT - 1;  /* Stay on the last line */
@@ -94,6 +123,11 @@ void terminal_newline(void) {
 
 /* Put a single character */
 void terminal_putchar(char c) {
+    /* If we're scrolled up, automatically scroll back to bottom on new content */
+    if (scroll_offset > 0) {
+        terminal_reset_scroll();
+    }
+    
     if (c == '\n') {
         terminal_newline();
         return;
@@ -347,5 +381,117 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
         
         /* Halt CPU until next interrupt */
         asm volatile ("hlt");
+    }
+}
+
+/*------------------------------------------------------------------------------
+ * Terminal Scrollback Functions
+ *------------------------------------------------------------------------------
+ */
+
+/* Helper function to save current terminal content */
+static void terminal_save_current_content(void) {
+    for (size_t i = 0; i < VGA_HEIGHT * VGA_WIDTH; i++) {
+        saved_terminal_buffer[i] = terminal_buffer[i];
+    }
+}
+
+/* Helper function to restore saved terminal content */
+static void terminal_restore_current_content(void) {
+    for (size_t i = 0; i < VGA_HEIGHT * VGA_WIDTH; i++) {
+        terminal_buffer[i] = saved_terminal_buffer[i];
+    }
+}
+
+/* Helper function to redraw the terminal from scrollback buffer */
+static void terminal_redraw_from_scrollback(void) {
+    if (scroll_offset == 0) {
+        /* Not scrolled, restore current content */
+        terminal_restore_current_content();
+        return;
+    }
+    
+    /* Ensure scroll offset doesn't exceed available history */
+    if ((size_t)scroll_offset > scrollback_lines_used) {
+        scroll_offset = (int)scrollback_lines_used;
+    }
+    
+    /* Fill the screen with the appropriate content */
+    for (size_t display_line = 0; display_line < VGA_HEIGHT; display_line++) {
+        /* Calculate which line to show (counting back from current) */
+        int lines_back = scroll_offset - (int)display_line;
+        
+        if (lines_back > 0 && lines_back <= (int)scrollback_lines_used) {
+            /* Show line from scrollback buffer */
+            size_t scrollback_index = (scrollback_head + SCROLLBACK_LINES - lines_back) % SCROLLBACK_LINES;
+            
+            for (size_t x = 0; x < VGA_WIDTH; x++) {
+                size_t src_index = scrollback_index * VGA_WIDTH + x;
+                size_t dst_index = display_line * VGA_WIDTH + x;
+                terminal_buffer[dst_index] = scrollback_buffer[src_index];
+            }
+        } else if (lines_back <= 0) {
+            /* Show line from current/saved content */
+            size_t saved_line = display_line - scroll_offset;
+            if (saved_line < VGA_HEIGHT) {
+                for (size_t x = 0; x < VGA_WIDTH; x++) {
+                    size_t src_index = saved_line * VGA_WIDTH + x;
+                    size_t dst_index = display_line * VGA_WIDTH + x;
+                    terminal_buffer[dst_index] = saved_terminal_buffer[src_index];
+                }
+            } else {
+                /* Clear line if beyond saved content */
+                for (size_t x = 0; x < VGA_WIDTH; x++) {
+                    size_t dst_index = display_line * VGA_WIDTH + x;
+                    terminal_buffer[dst_index] = vga_entry(' ', terminal_color);
+                }
+            }
+        } else {
+            /* Clear line if beyond available history */
+            for (size_t x = 0; x < VGA_WIDTH; x++) {
+                size_t dst_index = display_line * VGA_WIDTH + x;
+                terminal_buffer[dst_index] = vga_entry(' ', terminal_color);
+            }
+        }
+    }
+}
+
+/* Scroll the terminal view up by one line */
+void terminal_scroll_up(void) {
+    if (scrollback_lines_used == 0) {
+        return; /* No scrollback history available */
+    }
+    
+    if (scroll_offset == 0) {
+        /* First time scrolling up, save current content */
+        terminal_save_current_content();
+    }
+    
+    /* Limit scroll to available history */
+    int max_scroll = (int)scrollback_lines_used;
+    if (scroll_offset < max_scroll) {
+        scroll_offset++;
+        terminal_redraw_from_scrollback();
+    }
+}
+
+/* Scroll the terminal view down by one line */
+void terminal_scroll_down(void) {
+    if (scroll_offset > 0) {
+        scroll_offset--;
+        terminal_redraw_from_scrollback();
+    }
+}
+
+/* Check if the terminal is currently scrolled up (viewing history) */
+bool terminal_is_scrolled(void) {
+    return scroll_offset > 0;
+}
+
+/* Reset scroll position to show the current terminal content */
+void terminal_reset_scroll(void) {
+    if (scroll_offset > 0) {
+        scroll_offset = 0;
+        terminal_restore_current_content();
     }
 }
