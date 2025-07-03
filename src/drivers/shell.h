@@ -33,7 +33,7 @@ void shell_cmd_fsinfo(const char* args);
 
 /* Utility functions */
 void shell_print_prompt(void);
-bool shell_strcmp(const char* str1, const char* str2);
+bool shell_strcmp(const char* str1, const char* str2);  /* Case-insensitive comparison */
 size_t shell_strlen(const char* str);
 
 #endif /* SHELL_H */

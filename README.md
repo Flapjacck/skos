@@ -2,7 +2,7 @@
 
 ## About
 
-A simple operating system project for learning and experimentation purposes. SKOS now includes a complete FAT32 file system implementation with ATA/IDE storage support.
+A simple operating system project for learning and experimentation purposes.
 
 ## Features
 
@@ -44,7 +44,7 @@ sudo dnf install gcc nasm qemu grub2-tools xorriso dosfstools
 ## Quick Start
 
 ```bash
-git clone <Insert repository-url here> # add repository URL
+git clone https://github.com/Flapjacck/skos.git
 cd skos
 make          # Build kernel, create ISO, and disk image automatically
 make run      # Launch in QEMU with attached disk

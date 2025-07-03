@@ -128,14 +128,25 @@ static const shell_command_t commands[] = {
  *------------------------------------------------------------------------------
  */
 
-/* Simple string comparison function */
+/* Case-insensitive string comparison function */
 bool shell_strcmp(const char* str1, const char* str2) {
     if (str1 == NULL || str2 == NULL) {
         return false;
     }
     
     while (*str1 && *str2) {
-        if (*str1 != *str2) {
+        char c1 = *str1;
+        char c2 = *str2;
+        
+        /* Convert to lowercase for comparison */
+        if (c1 >= 'A' && c1 <= 'Z') {
+            c1 = c1 + 32;  /* Convert uppercase to lowercase */
+        }
+        if (c2 >= 'A' && c2 <= 'Z') {
+            c2 = c2 + 32;  /* Convert uppercase to lowercase */
+        }
+        
+        if (c1 != c2) {
             return false;
         }
         str1++;
