@@ -21,16 +21,16 @@ static fat32_fs_info_t fs_info;
 /* Primary storage device */
 static ata_device_t* storage_device = NULL;
 
-/* Temporary sector buffer for I/O operations */
-static uint8_t sector_buffer[512] __attribute__((aligned(4)));
+/* Temporary sector buffer for I/O operations - now dynamically allocated */
+static uint8_t* sector_buffer = NULL;
 
-/* File handle pool */
+/* File handle pool - now dynamically allocated */
 #define MAX_OPEN_FILES 16
-static fat32_file_t file_handles[MAX_OPEN_FILES];
+static fat32_file_t* file_handles = NULL;
 
-/* Directory handle pool */
+/* Directory handle pool - now dynamically allocated */
 #define MAX_OPEN_DIRS 8
-static fat32_dir_t dir_handles[MAX_OPEN_DIRS];
+static fat32_dir_t* dir_handles = NULL;
 
 /*------------------------------------------------------------------------------
  * Low-level disk I/O functions
@@ -64,6 +64,25 @@ bool fat32_write_sector(uint32_t sector, const void* buffer) {
 
 /* Initialize FAT32 file system */
 bool fat32_init(void) {
+    /* Allocate dynamic buffers */
+    sector_buffer = (uint8_t*)kmalloc(512);
+    if (!sector_buffer) {
+        return false;
+    }
+    
+    file_handles = (fat32_file_t*)kcalloc(MAX_OPEN_FILES, sizeof(fat32_file_t));
+    if (!file_handles) {
+        kfree(sector_buffer);
+        return false;
+    }
+    
+    dir_handles = (fat32_dir_t*)kcalloc(MAX_OPEN_DIRS, sizeof(fat32_dir_t));
+    if (!dir_handles) {
+        kfree(sector_buffer);
+        kfree(file_handles);
+        return false;
+    }
+    
     /* Clear file system info */
     for (size_t i = 0; i < sizeof(fat32_fs_info_t); i++) {
         ((uint8_t*)&fs_info)[i] = 0;
@@ -617,4 +636,24 @@ void fat32_print_file_info(const fat32_dir_entry_t* entry) {
 /* Get file system information */
 fat32_fs_info_t* fat32_get_fs_info(void) {
     return fs_info.initialized ? &fs_info : NULL;
+}
+
+/* Cleanup FAT32 file system */
+void fat32_cleanup(void) {
+    if (sector_buffer) {
+        kfree(sector_buffer);
+        sector_buffer = NULL;
+    }
+    
+    if (file_handles) {
+        kfree(file_handles);
+        file_handles = NULL;
+    }
+    
+    if (dir_handles) {
+        kfree(dir_handles);
+        dir_handles = NULL;
+    }
+    
+    fs_info.initialized = false;
 }

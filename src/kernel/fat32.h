@@ -168,4 +168,7 @@ void fat32_print_file_info(const fat32_dir_entry_t* entry);
 /* Get file system information */
 fat32_fs_info_t* fat32_get_fs_info(void);
 
+/* Cleanup FAT32 file system */
+void fat32_cleanup(void);
+
 #endif /* FAT32_H */

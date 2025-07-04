@@ -105,4 +105,38 @@ uint32_t physical_to_virtual(uint32_t physical_addr);
 void memory_print_stats(void);
 void memory_print_map(void);
 
+/* Heap allocator constants */
+#define HEAP_START_ADDR     0xC0400000  /* Start heap at 4MB in kernel space */
+#define HEAP_INITIAL_SIZE   0x100000    /* Initial heap size: 1MB */
+#define HEAP_MAX_SIZE       0x1000000   /* Maximum heap size: 16MB */
+#define HEAP_BLOCK_MAGIC    0xDEADBEEF  /* Magic number for heap blocks */
+
+/* Heap block structure */
+typedef struct heap_block {
+    uint32_t magic;                 /* Magic number for validation */
+    uint32_t size;                  /* Size of this block (including header) */
+    bool is_free;                   /* Whether this block is free */
+    struct heap_block* next;        /* Next block in the list */
+    struct heap_block* prev;        /* Previous block in the list */
+} __attribute__((packed)) heap_block_t;
+
+/* Heap allocator structure */
+typedef struct {
+    uint32_t start_addr;            /* Virtual start address of heap */
+    uint32_t end_addr;              /* Virtual end address of heap */
+    uint32_t size;                  /* Current heap size */
+    heap_block_t* first_block;      /* First block in the heap */
+    bool initialized;               /* Whether heap is initialized */
+} heap_info_t;
+
+/* Heap allocator functions */
+void heap_init(void);
+void* kmalloc(size_t size);
+void* kcalloc(size_t count, size_t size);
+void* krealloc(void* ptr, size_t size);
+void kfree(void* ptr);
+size_t heap_get_allocated_size(void* ptr);
+void heap_print_stats(void);
+void heap_validate(void);
+
 #endif /* MEMORY_H */

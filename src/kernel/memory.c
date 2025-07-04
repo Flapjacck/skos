@@ -52,6 +52,9 @@ void memory_init(multiboot_info_t* mboot_info) {
     /* Initialize paging */
     paging_init();
     
+    /* Initialize heap allocator */
+    heap_init();
+    
     /* Print concise memory statistics */
     terminal_writestring(" (");
     
@@ -623,4 +626,535 @@ void memory_print_map(void) {
     entries_str[i] = '\0';
     terminal_writestring(entries_str);
     terminal_writestring("\n");
+}
+
+/*------------------------------------------------------------------------------
+ * Heap allocator implementation
+ *------------------------------------------------------------------------------
+ */
+
+/* Global heap information */
+static heap_info_t heap;
+
+/**
+ * @brief Initialize the kernel heap allocator
+ */
+void heap_init(void) {
+    /* Clear heap structure */
+    heap.start_addr = HEAP_START_ADDR;
+    heap.end_addr = HEAP_START_ADDR;
+    heap.size = 0;
+    heap.first_block = NULL;
+    heap.initialized = false;
+    
+    /* Allocate initial heap pages */
+    uint32_t initial_pages = HEAP_INITIAL_SIZE / PAGE_SIZE;
+    for (uint32_t i = 0; i < initial_pages; i++) {
+        uint32_t phys_page = allocate_physical_page();
+        if (!phys_page) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+            terminal_writestring("ERROR: Cannot allocate initial heap pages!\n");
+            return;
+        }
+        
+        uint32_t virt_addr = heap.start_addr + (i * PAGE_SIZE);
+        map_page(virt_addr, phys_page, PAGE_PRESENT | PAGE_WRITABLE);
+    }
+    
+    heap.end_addr = heap.start_addr + HEAP_INITIAL_SIZE;
+    heap.size = HEAP_INITIAL_SIZE;
+    
+    /* Create the first free block spanning the entire heap */
+    heap.first_block = (heap_block_t*)heap.start_addr;
+    heap.first_block->magic = HEAP_BLOCK_MAGIC;
+    heap.first_block->size = HEAP_INITIAL_SIZE;
+    heap.first_block->is_free = true;
+    heap.first_block->next = NULL;
+    heap.first_block->prev = NULL;
+    
+    heap.initialized = true;
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Heap initialized: ");
+    char size_str[16];
+    uint32_t size_kb = HEAP_INITIAL_SIZE / 1024;
+    int i = 0;
+    if (size_kb == 0) {
+        size_str[i++] = '0';
+    } else {
+        while (size_kb > 0) {
+            size_str[i++] = '0' + (size_kb % 10);
+            size_kb /= 10;
+        }
+    }
+    for (int j = 0; j < i/2; j++) {
+        char temp = size_str[j];
+        size_str[j] = size_str[i-1-j];
+        size_str[i-1-j] = temp;
+    }
+    size_str[i] = '\0';
+    terminal_writestring(size_str);
+    terminal_writestring("KB\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+}
+
+/**
+ * @brief Expand the heap by allocating more pages
+ * @param min_increase Minimum number of bytes to add to heap
+ * @return true if successful, false otherwise
+ */
+static bool heap_expand(size_t min_increase) {
+    if (!heap.initialized) {
+        return false;
+    }
+    
+    /* Round up to nearest page boundary */
+    size_t pages_needed = (min_increase + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t increase = pages_needed * PAGE_SIZE;
+    
+    /* Check if we would exceed maximum heap size */
+    if (heap.size + increase > HEAP_MAX_SIZE) {
+        return false;
+    }
+    
+    /* Allocate physical pages and map them */
+    for (size_t i = 0; i < pages_needed; i++) {
+        uint32_t phys_page = allocate_physical_page();
+        if (!phys_page) {
+            /* Free any pages we already allocated */
+            for (size_t j = 0; j < i; j++) {
+                uint32_t virt_addr = heap.end_addr + (j * PAGE_SIZE);
+                uint32_t phys_addr = get_physical_address(virt_addr);
+                unmap_page(virt_addr);
+                free_physical_page(phys_addr);
+            }
+            return false;
+        }
+        
+        uint32_t virt_addr = heap.end_addr + (i * PAGE_SIZE);
+        map_page(virt_addr, phys_page, PAGE_PRESENT | PAGE_WRITABLE);
+    }
+    
+    /* Find the last block and extend it or create a new one */
+    heap_block_t* last_block = heap.first_block;
+    while (last_block && last_block->next) {
+        last_block = last_block->next;
+    }
+    
+    if (last_block && last_block->is_free) {
+        /* Extend the last free block */
+        last_block->size += increase;
+    } else {
+        /* Create a new free block at the end */
+        heap_block_t* new_block = (heap_block_t*)heap.end_addr;
+        new_block->magic = HEAP_BLOCK_MAGIC;
+        new_block->size = increase;
+        new_block->is_free = true;
+        new_block->next = NULL;
+        new_block->prev = last_block;
+        
+        if (last_block) {
+            last_block->next = new_block;
+        }
+    }
+    
+    heap.end_addr += increase;
+    heap.size += increase;
+    
+    return true;
+}
+
+/**
+ * @brief Split a heap block if it's large enough
+ * @param block Block to split
+ * @param size Size needed for the first part
+ */
+static void heap_split_block(heap_block_t* block, size_t size) {
+    if (!block || block->size < size + sizeof(heap_block_t) + 16) {
+        return; /* Block too small to split */
+    }
+    
+    /* Calculate address for new block */
+    uint32_t new_block_addr = (uint32_t)block + size;
+    heap_block_t* new_block = (heap_block_t*)new_block_addr;
+    
+    /* Set up new block */
+    new_block->magic = HEAP_BLOCK_MAGIC;
+    new_block->size = block->size - size;
+    new_block->is_free = true;
+    new_block->next = block->next;
+    new_block->prev = block;
+    
+    /* Update links */
+    if (block->next) {
+        block->next->prev = new_block;
+    }
+    block->next = new_block;
+    
+    /* Update original block size */
+    block->size = size;
+}
+
+/**
+ * @brief Coalesce adjacent free blocks
+ * @param block Block to start coalescing from
+ */
+static void heap_coalesce(heap_block_t* block) {
+    if (!block || !block->is_free) {
+        return;
+    }
+    
+    /* Coalesce with next block if it's free */
+    while (block->next && block->next->is_free) {
+        heap_block_t* next = block->next;
+        block->size += next->size;
+        block->next = next->next;
+        if (next->next) {
+            next->next->prev = block;
+        }
+        /* Clear the absorbed block's magic to prevent confusion */
+        next->magic = 0;
+    }
+    
+    /* Coalesce with previous block if it's free */
+    if (block->prev && block->prev->is_free) {
+        heap_block_t* prev = block->prev;
+        prev->size += block->size;
+        prev->next = block->next;
+        if (block->next) {
+            block->next->prev = prev;
+        }
+        /* Clear the absorbed block's magic */
+        block->magic = 0;
+    }
+}
+
+/**
+ * @brief Allocate memory from the kernel heap
+ * @param size Number of bytes to allocate
+ * @return Pointer to allocated memory, or NULL if allocation failed
+ */
+void* kmalloc(size_t size) {
+    if (!heap.initialized || size == 0) {
+        return NULL;
+    }
+    
+    /* Align size to 4-byte boundary and add header size */
+    size = (size + 3) & ~3;
+    size_t total_size = size + sizeof(heap_block_t);
+    
+    /* Find a suitable free block */
+    heap_block_t* current = heap.first_block;
+    while (current) {
+        if (current->magic != HEAP_BLOCK_MAGIC) {
+            /* Corrupted heap detected */
+            terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+            terminal_writestring("HEAP CORRUPTION DETECTED!\n");
+            return NULL;
+        }
+        
+        if (current->is_free && current->size >= total_size) {
+            /* Found a suitable block */
+            heap_split_block(current, total_size);
+            current->is_free = false;
+            
+            /* Return pointer to data area (after header) */
+            return (void*)((uint32_t)current + sizeof(heap_block_t));
+        }
+        current = current->next;
+    }
+    
+    /* No suitable block found, try to expand heap */
+    if (!heap_expand(total_size)) {
+        return NULL; /* Out of memory */
+    }
+    
+    /* Try allocation again after expansion */
+    return kmalloc(size);
+}
+
+/**
+ * @brief Allocate and zero-initialize memory from the kernel heap
+ * @param count Number of elements
+ * @param size Size of each element
+ * @return Pointer to allocated and zeroed memory, or NULL if allocation failed
+ */
+void* kcalloc(size_t count, size_t size) {
+    size_t total_size = count * size;
+    void* ptr = kmalloc(total_size);
+    
+    if (ptr) {
+        /* Zero the memory */
+        uint8_t* bytes = (uint8_t*)ptr;
+        for (size_t i = 0; i < total_size; i++) {
+            bytes[i] = 0;
+        }
+    }
+    
+    return ptr;
+}
+
+/**
+ * @brief Free memory allocated by kmalloc
+ * @param ptr Pointer to memory to free
+ */
+void kfree(void* ptr) {
+    if (!ptr || !heap.initialized) {
+        return;
+    }
+    
+    /* Get block header */
+    heap_block_t* block = (heap_block_t*)((uint32_t)ptr - sizeof(heap_block_t));
+    
+    /* Validate block */
+    if (block->magic != HEAP_BLOCK_MAGIC) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+        terminal_writestring("ERROR: Invalid heap block in kfree!\n");
+        return;
+    }
+    
+    if (block->is_free) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
+        terminal_writestring("WARNING: Double free detected!\n");
+        return;
+    }
+    
+    /* Mark block as free */
+    block->is_free = true;
+    
+    /* Coalesce with adjacent free blocks */
+    heap_coalesce(block);
+}
+
+/**
+ * @brief Reallocate memory to a new size
+ * @param ptr Existing pointer (can be NULL)
+ * @param size New size in bytes
+ * @return Pointer to reallocated memory, or NULL if allocation failed
+ */
+void* krealloc(void* ptr, size_t size) {
+    if (!ptr) {
+        return kmalloc(size);
+    }
+    
+    if (size == 0) {
+        kfree(ptr);
+        return NULL;
+    }
+    
+    /* Get current block */
+    heap_block_t* block = (heap_block_t*)((uint32_t)ptr - sizeof(heap_block_t));
+    if (block->magic != HEAP_BLOCK_MAGIC) {
+        return NULL;
+    }
+    
+    size_t current_data_size = block->size - sizeof(heap_block_t);
+    size_t aligned_size = (size + 3) & ~3;
+    
+    /* If new size fits in current block, just return same pointer */
+    if (aligned_size <= current_data_size) {
+        return ptr;
+    }
+    
+    /* Allocate new block and copy data */
+    void* new_ptr = kmalloc(size);
+    if (!new_ptr) {
+        return NULL;
+    }
+    
+    /* Copy old data */
+    uint8_t* src = (uint8_t*)ptr;
+    uint8_t* dst = (uint8_t*)new_ptr;
+    for (size_t i = 0; i < current_data_size && i < size; i++) {
+        dst[i] = src[i];
+    }
+    
+    /* Free old block */
+    kfree(ptr);
+    
+    return new_ptr;
+}
+
+/**
+ * @brief Get the allocated size of a heap block
+ * @param ptr Pointer returned by kmalloc
+ * @return Size of allocated block (data area only), or 0 if invalid
+ */
+size_t heap_get_allocated_size(void* ptr) {
+    if (!ptr || !heap.initialized) {
+        return 0;
+    }
+    
+    heap_block_t* block = (heap_block_t*)((uint32_t)ptr - sizeof(heap_block_t));
+    if (block->magic != HEAP_BLOCK_MAGIC) {
+        return 0;
+    }
+    
+    return block->size - sizeof(heap_block_t);
+}
+
+/**
+ * @brief Print heap statistics for debugging
+ */
+void heap_print_stats(void) {
+    if (!heap.initialized) {
+        terminal_writestring("Heap not initialized\n");
+        return;
+    }
+    
+    uint32_t total_blocks = 0;
+    uint32_t free_blocks = 0;
+    uint32_t allocated_blocks = 0;
+    uint32_t free_bytes = 0;
+    uint32_t allocated_bytes = 0;
+    
+    heap_block_t* current = heap.first_block;
+    while (current) {
+        total_blocks++;
+        if (current->is_free) {
+            free_blocks++;
+            free_bytes += current->size;
+        } else {
+            allocated_blocks++;
+            allocated_bytes += current->size;
+        }
+        current = current->next;
+    }
+    
+    terminal_writestring("Heap Statistics:\n");
+    terminal_writestring("  Total heap size: ");
+    
+    char size_str[16];
+    uint32_t size_kb = heap.size / 1024;
+    int i = 0;
+    if (size_kb == 0) {
+        size_str[i++] = '0';
+    } else {
+        while (size_kb > 0) {
+            size_str[i++] = '0' + (size_kb % 10);
+            size_kb /= 10;
+        }
+    }
+    for (int j = 0; j < i/2; j++) {
+        char temp = size_str[j];
+        size_str[j] = size_str[i-1-j];
+        size_str[i-1-j] = temp;
+    }
+    size_str[i] = '\0';
+    terminal_writestring(size_str);
+    terminal_writestring("KB\n");
+    
+    /* Print block counts */
+    terminal_writestring("  Total blocks: ");
+    i = 0;
+    uint32_t temp = total_blocks;
+    if (temp == 0) {
+        size_str[i++] = '0';
+    } else {
+        while (temp > 0) {
+            size_str[i++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    for (int j = 0; j < i/2; j++) {
+        char temp_char = size_str[j];
+        size_str[j] = size_str[i-1-j];
+        size_str[i-1-j] = temp_char;
+    }
+    size_str[i] = '\0';
+    terminal_writestring(size_str);
+    terminal_writestring(" (");
+    
+    /* Print free blocks */
+    i = 0;
+    temp = free_blocks;
+    if (temp == 0) {
+        size_str[i++] = '0';
+    } else {
+        while (temp > 0) {
+            size_str[i++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    for (int j = 0; j < i/2; j++) {
+        char temp_char = size_str[j];
+        size_str[j] = size_str[i-1-j];
+        size_str[i-1-j] = temp_char;
+    }
+    size_str[i] = '\0';
+    terminal_writestring(size_str);
+    terminal_writestring(" free, ");
+    
+    /* Print allocated blocks */
+    i = 0;
+    temp = allocated_blocks;
+    if (temp == 0) {
+        size_str[i++] = '0';
+    } else {
+        while (temp > 0) {
+            size_str[i++] = '0' + (temp % 10);
+            temp /= 10;
+        }
+    }
+    for (int j = 0; j < i/2; j++) {
+        char temp_char = size_str[j];
+        size_str[j] = size_str[i-1-j];
+        size_str[i-1-j] = temp_char;
+    }
+    size_str[i] = '\0';
+    terminal_writestring(size_str);
+    terminal_writestring(" allocated)\n");
+}
+
+/**
+ * @brief Validate heap integrity
+ */
+void heap_validate(void) {
+    if (!heap.initialized) {
+        return;
+    }
+    
+    heap_block_t* current = heap.first_block;
+    uint32_t block_count = 0;
+    
+    while (current) {
+        /* Check magic number */
+        if (current->magic != HEAP_BLOCK_MAGIC) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+            terminal_writestring("HEAP VALIDATION FAILED: Invalid magic number\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+            return;
+        }
+        
+        /* Check size alignment */
+        if (current->size < sizeof(heap_block_t) || (current->size % 4) != 0) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+            terminal_writestring("HEAP VALIDATION FAILED: Invalid block size\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+            return;
+        }
+        
+        /* Check bounds */
+        if ((uint32_t)current < heap.start_addr || 
+            (uint32_t)current + current->size > heap.end_addr) {
+            terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+            terminal_writestring("HEAP VALIDATION FAILED: Block out of bounds\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+            return;
+        }
+        
+        block_count++;
+        if (block_count > 10000) { /* Prevent infinite loops */
+            terminal_setcolor(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+            terminal_writestring("HEAP VALIDATION FAILED: Too many blocks (possible loop)\n");
+            terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+            return;
+        }
+        
+        current = current->next;
+    }
+    
+    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Heap validation passed\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
 }
