@@ -54,53 +54,6 @@ void memory_init(multiboot_info_t* mboot_info) {
     
     /* Initialize heap allocator */
     heap_init();
-    
-    /* Print concise memory statistics */
-    terminal_writestring(" (");
-    
-    /* Print total memory in MB */
-    uint32_t total_mb = total_memory_kb / 1024;
-    char mb_str[16];
-    int i = 0;
-    if (total_mb == 0) {
-        mb_str[i++] = '0';
-    } else {
-        while (total_mb > 0) {
-            mb_str[i++] = '0' + (total_mb % 10);
-            total_mb /= 10;
-        }
-    }
-    /* Reverse string */
-    for (int j = 0; j < i/2; j++) {
-        char temp = mb_str[j];
-        mb_str[j] = mb_str[i-1-j];
-        mb_str[i-1-j] = temp;
-    }
-    mb_str[i] = '\0';
-    
-    terminal_writestring(mb_str);
-    terminal_writestring("MB, ");
-    
-    /* Print used pages */
-    uint32_t used = phys_allocator.used_pages;
-    char used_str[16];
-    i = 0;
-    if (used == 0) {
-        used_str[i++] = '0';
-    } else {
-        while (used > 0) {
-            used_str[i++] = '0' + (used % 10);
-            used /= 10;
-        }
-    }
-    for (int j = 0; j < i/2; j++) {
-        char temp = used_str[j];
-        used_str[j] = used_str[i-1-j];
-        used_str[i-1-j] = temp;
-    }
-    used_str[i] = '\0';
-    terminal_writestring(used_str);
-    terminal_writestring(" pages used)");
 }
 
 /**
@@ -673,29 +626,6 @@ void heap_init(void) {
     heap.first_block->prev = NULL;
     
     heap.initialized = true;
-    
-    terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("Heap initialized: ");
-    char size_str[16];
-    uint32_t size_kb = HEAP_INITIAL_SIZE / 1024;
-    int i = 0;
-    if (size_kb == 0) {
-        size_str[i++] = '0';
-    } else {
-        while (size_kb > 0) {
-            size_str[i++] = '0' + (size_kb % 10);
-            size_kb /= 10;
-        }
-    }
-    for (int j = 0; j < i/2; j++) {
-        char temp = size_str[j];
-        size_str[j] = size_str[i-1-j];
-        size_str[i-1-j] = temp;
-    }
-    size_str[i] = '\0';
-    terminal_writestring(size_str);
-    terminal_writestring("KB\n");
-    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
 }
 
 /**

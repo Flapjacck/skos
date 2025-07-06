@@ -274,32 +274,29 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     
     /* Boot sequence header */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-    terminal_writestring("=== SYSTEM INITIALIZATION ===\n\n");
+    terminal_writestring("=== SYSTEM INITIALIZATION ===\n");
     
-    /* Initialize Global Descriptor Table (GDT) */
+    /* Initialize core systems */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing GDT... ");
+    terminal_writestring("GDT ");
     gdt_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("OK\n");
+    terminal_writestring("OK ");
     
-    /* Initialize Interrupt Descriptor Table (IDT) */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing IDT... ");
+    terminal_writestring("IDT ");
     idt_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("OK\n");
+    terminal_writestring("OK ");
     
-    /* Initialize Programmable Interrupt Controller (PIC) */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing PIC... ");
+    terminal_writestring("PIC ");
     pic_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("OK\n");
+    terminal_writestring("OK ");
     
-    /* Initialize Timer */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Timer... ");
+    terminal_writestring("TIMER ");
     timer_init();
     pic_unmask_irq(0);  /* Enable timer interrupts (IRQ 0) */
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
@@ -307,40 +304,61 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     
     /* Initialize Memory Management */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Memory... ");
+    terminal_writestring("MEMORY ");
     memory_init(mboot_info);
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("OK\n");
+    terminal_writestring("OK ");
     
-    /* Initialize Keyboard Driver */
+    /* Print memory info */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Keyboard... ");
+    terminal_writestring("(");
+    uint32_t total_mb = get_total_memory() / (1024 * 1024);
+    char mb_str[16];
+    int i = 0;
+    if (total_mb == 0) {
+        mb_str[i++] = '0';
+    } else {
+        while (total_mb > 0) {
+            mb_str[i++] = '0' + (total_mb % 10);
+            total_mb /= 10;
+        }
+    }
+    for (int j = 0; j < i/2; j++) {
+        char temp = mb_str[j];
+        mb_str[j] = mb_str[i-1-j];
+        mb_str[i-1-j] = temp;
+    }
+    mb_str[i] = '\0';
+    terminal_writestring(mb_str);
+    terminal_writestring("MB)\n");
+    
+    /* Initialize Devices */
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    terminal_writestring("KEYBOARD ");
     keyboard_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("OK\n");
+    terminal_writestring("OK ");
     
-    /* Initialize Shell Driver */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing Shell... ");
+    terminal_writestring("SHELL ");
     shell_init();
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
     terminal_writestring("OK\n");
     
-    /* Initialize ATA Driver */
+    /* Initialize Storage */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing ATA/IDE... ");
+    terminal_writestring("ATA ");
     bool ata_success = ata_init();
     if (ata_success) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-        terminal_writestring("OK\n");
+        terminal_writestring("OK ");
     } else {
         terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK));
-        terminal_writestring("NO DRIVES\n");
+        terminal_writestring("NO DRIVES ");
     }
     
-    /* Initialize FAT32 File System */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Initializing FAT32... ");
+    terminal_writestring("FAT32 ");
     bool fat32_success = fat32_init();
     if (fat32_success) {
         terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
@@ -352,13 +370,12 @@ void kernel_main(uint32_t magic, multiboot_info_t* mboot_info) {
     
     /* Enable interrupts */
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
-    terminal_writestring("Enabling interrupts... ");
+    terminal_writestring("Enabling interrupts ");
     asm volatile ("sti");  /* Enable interrupts */
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("OK\n");
+    terminal_writestring("OK\n\n");
     
     /* Boot complete message */
-    terminal_writestring("\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
     terminal_writestring("=== SYSTEM READY ===\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
