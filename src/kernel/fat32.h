@@ -149,6 +149,7 @@ uint32_t fat32_cluster_to_sector(uint32_t cluster);
 
 /* File operations */
 fat32_file_t* fat32_open(const char* filename);
+fat32_file_t* fat32_create(const char* filename);  /* Create a new file */
 void fat32_close(fat32_file_t* file);
 size_t fat32_read(fat32_file_t* file, void* buffer, size_t size);
 size_t fat32_write(fat32_file_t* file, const void* buffer, size_t size);

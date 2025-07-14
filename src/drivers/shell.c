@@ -118,6 +118,7 @@ static const shell_command_t commands[] = {
     {"scancode", shell_cmd_scancode, "Enter scancode debug mode (press q to quit)"},
     {"ls", shell_cmd_ls, "List files in current directory"},
     {"cat", shell_cmd_cat, "Display contents of a file"},
+    {"write", shell_cmd_write, "Write text to a file (usage: write filename text)"},
     {"fsinfo", shell_cmd_fsinfo, "Show file system information"}
 };
 
@@ -968,6 +969,140 @@ void shell_cmd_cat(const char* args) {
     
     terminal_writestring(bytes_str);
     terminal_writestring("\n\n");
+}
+
+/* Write text to file command */
+void shell_cmd_write(const char* args) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+    terminal_writestring("\n=== WRITE TO FILE ===\n\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    
+    /* Check if FAT32 is initialized */
+    fat32_fs_info_t* fs_info = fat32_get_fs_info();
+    if (!fs_info) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("File system not initialized!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    /* Parse arguments: write filename text */
+    if (!args || shell_strlen(args) == 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("Usage: write <filename> <text>\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        terminal_writestring("Example: write test.txt Hello World!\n\n");
+        return;
+    }
+    
+    /* Find first space to separate filename from text */
+    const char* filename = args;
+    const char* text = NULL;
+    
+    size_t filename_len = 0;
+    while (args[filename_len] && args[filename_len] != ' ') {
+        filename_len++;
+    }
+    
+    if (args[filename_len] == ' ') {
+        /* Skip spaces to find text */
+        text = &args[filename_len];
+        while (*text == ' ') {
+            text++;
+        }
+    }
+    
+    if (!text || shell_strlen(text) == 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("No text provided to write!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    /* Create a null-terminated filename */
+    char filename_buffer[32];
+    if (filename_len >= sizeof(filename_buffer)) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("Filename too long!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    for (size_t i = 0; i < filename_len; i++) {
+        filename_buffer[i] = filename[i];
+    }
+    filename_buffer[filename_len] = '\0';
+    
+    terminal_writestring("Writing to file: ");
+    terminal_writestring(filename_buffer);
+    terminal_writestring("\n");
+    terminal_writestring("Text: ");
+    terminal_writestring(text);
+    terminal_writestring("\n\n");
+    
+    /* Create or open the file for writing */
+    fat32_file_t* file = fat32_create(filename_buffer);
+    if (!file) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("Failed to create/open file: ");
+        terminal_writestring(filename_buffer);
+        terminal_writestring("\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+        return;
+    }
+    
+    /* Write the text to the file */
+    size_t text_len = shell_strlen(text);
+    size_t bytes_written = fat32_write(file, text, text_len);
+    
+    /* Add a newline at the end */
+    if (bytes_written == text_len) {
+        fat32_write(file, "\n", 1);
+        bytes_written++;
+    }
+    
+    fat32_close(file);
+    
+    /* Report success */
+    if (bytes_written > 0) {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+        terminal_writestring("Successfully wrote ");
+        
+        /* Print bytes written */
+        char bytes_str[16];
+        int digits = 0;
+        size_t temp = bytes_written;
+        
+        if (temp == 0) {
+            bytes_str[0] = '0';
+            digits = 1;
+        } else {
+            while (temp > 0) {
+                bytes_str[digits++] = '0' + (temp % 10);
+                temp /= 10;
+            }
+        }
+        
+        /* Reverse the string */
+        for (int i = 0; i < digits / 2; i++) {
+            char temp_c = bytes_str[i];
+            bytes_str[i] = bytes_str[digits - 1 - i];
+            bytes_str[digits - 1 - i] = temp_c;
+        }
+        bytes_str[digits] = '\0';
+        
+        terminal_writestring(bytes_str);
+        terminal_writestring(" bytes to ");
+        terminal_writestring(filename_buffer);
+        terminal_writestring("\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    } else {
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+        terminal_writestring("Failed to write to file!\n");
+        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+    }
+    
+    terminal_writestring("\n");
 }
 
 /* File system info command - shows FAT32 information */

@@ -1,6 +1,10 @@
 #ifndef SHELL_H
-#define SHELL_H
+#define SHELLvoid shell_cmd_ls(const char* args);
+void shell_cmd_cat(const char* args);
+void shell_cmd_write(const char* args);
+void shell_cmd_fsinfo(const char* args);
 
+/* Utility functions */
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -29,6 +33,7 @@ void shell_cmd_reboot(const char* args);
 void shell_cmd_scancode(const char* args);
 void shell_cmd_ls(const char* args);
 void shell_cmd_cat(const char* args);
+void shell_cmd_write(const char* args);
 void shell_cmd_fsinfo(const char* args);
 
 /* Utility functions */
